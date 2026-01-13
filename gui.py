@@ -32,7 +32,7 @@ if getattr(sys, 'frozen', False):
 # ---------------------------------------------------------
 # PyQt6
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QTextCursor
+from PyQt6.QtGui import QColor, QTextCursor, QBrush
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QProgressBar, QTableWidgetItem, QHeaderView,
@@ -128,7 +128,9 @@ class SMTWorker(QThread):
                 raise ValueError("No valid resources loaded. Cannot proceed.")
 
             self.log_signal.emit("Starting SMT Optimization (Z3)...")
-            results = run_optimization(recipe_data, all_capabilities, log_callback=self.log_signal.emit)
+            
+            # Call with generate_json=True to save all solutions
+            results = run_optimization(recipe_data, all_capabilities, log_callback=self.log_signal.emit, generate_json=True)
             
             self.progress_signal.emit(100, 100)
             self.finished_signal.emit(results)
@@ -162,17 +164,18 @@ class ResultsPage(QWidget):
         super().__init__(parent)
         self.setObjectName("results_page")
         layout = QVBoxLayout(self)
-        self.title = SubtitleLabel("Matching Results", self)
+        self.title = SubtitleLabel("Matching Results (All Solutions)", self)
         
         self.table = TableWidget(self)
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Step ID", "Description", "Assigned Resource", "Capabilities", "Status"])
+        # Increased column count to 6 to include Solution ID
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["Sol ID", "Step ID", "Description", "Assigned Resource", "Capabilities", "Status"])
         self.table.verticalHeader().setVisible(False)
         self.table.setBorderVisible(True)
         self.table.setWordWrap(False)
         
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch) # Capabilities column stretch
         
         layout.addWidget(self.title)
         layout.addWidget(self.table, 1)
@@ -180,15 +183,34 @@ class ResultsPage(QWidget):
     def update_table(self, data: List[Dict]):
         self.table.setRowCount(len(data))
         for r, row_data in enumerate(data):
-            self.table.setItem(r, 0, QTableWidgetItem(str(row_data['step_id'])))
-            self.table.setItem(r, 1, QTableWidgetItem(str(row_data['description'])))
-            self.table.setItem(r, 2, QTableWidgetItem(str(row_data['resource'])))
-            self.table.setItem(r, 3, QTableWidgetItem(str(row_data['capabilities'])))
             
-            # Status item with theme color (Green for success)
+            # Check if this is a separator row (empty dict)
+            if not row_data:
+                # Fill the row with empty, disabled items to create a visual break
+                for c in range(6):
+                    item = QTableWidgetItem("")
+                    # Set background color slightly different to indicate separator (optional, works better in light mode)
+                    # item.setBackground(QBrush(QColor(50, 50, 50))) 
+                    item.setFlags(Qt.ItemFlag.NoItemFlags) # Disable selection
+                    self.table.setItem(r, c, item)
+                continue
+
+            # Regular Data Row
+            # Col 0: Solution ID
+            self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
+            # Col 1: Step ID
+            self.table.setItem(r, 1, QTableWidgetItem(str(row_data['step_id'])))
+            # Col 2: Description
+            self.table.setItem(r, 2, QTableWidgetItem(str(row_data['description'])))
+            # Col 3: Resource
+            self.table.setItem(r, 3, QTableWidgetItem(str(row_data['resource'])))
+            # Col 4: Capabilities
+            self.table.setItem(r, 4, QTableWidgetItem(str(row_data['capabilities'])))
+            
+            # Col 5: Status (Green)
             status_item = QTableWidgetItem(str(row_data['status']))
             status_item.setForeground(QColor("#28a745")) 
-            self.table.setItem(r, 4, status_item)
+            self.table.setItem(r, 5, status_item)
 
 class HomePage(QWidget):
     def __init__(self, log_callback, parent=None):
@@ -299,7 +321,7 @@ class HomePage(QWidget):
         if isinstance(main, MainWindow):
             main.results_page.update_table(results)
             main.switchTo(main.results_page)
-            InfoBar.success(title="Completed", content="Calculation finished. Check the Results tab.", parent=main, position=InfoBarPosition.TOP_RIGHT)
+            InfoBar.success(title="Completed", content=f"Calculation finished. Found valid solutions.", parent=main, position=InfoBarPosition.TOP_RIGHT)
 
 # ---------------------------------------------------------
 # SETTINGS PAGE
@@ -323,7 +345,7 @@ class SettingsPage(QWidget):
         lbl_theme = BodyLabel("Dark Mode", self)
         self.switch_theme = SwitchButton(self)
         
-        # [MODIFIED] Set default to True for Dark Mode
+        # Set default to True for Dark Mode
         self.switch_theme.setChecked(True) 
         
         self.switch_theme.checkedChanged.connect(self.toggle_theme)
@@ -351,7 +373,7 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
         
-        # [MODIFIED] Set default theme to DARK
+        # Set default theme to DARK
         setTheme(Theme.DARK)
         
         self.resize(1000, 700)
