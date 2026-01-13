@@ -19,10 +19,8 @@ if getattr(sys, 'frozen', False):
     os.environ['DYLD_LIBRARY_PATH'] = f"{bundle_dir}{os.pathsep}{current_dyld}"
     os.environ['PATH'] = f"{bundle_dir}{os.pathsep}{os.environ.get('PATH', '')}"
     
-    # 2. Fix "Print Crash" (Stdout/Stderr Redirection)
-    # macOS .app will crash if print() is called without a console.
-    # We redirect all output to a log file on your Desktop for debugging.
-    # After it works, you can change this to os.devnull.
+    # 2. Fix "Print Crash" (Stdout/Stderr Redirection) - SILENT MODE
+    # Redirect output to "null" to prevent crash without creating a file on Desktop
     try:
         sys.stdout = open(os.devnull, "w")
         sys.stderr = open(os.devnull, "w")
@@ -50,15 +48,24 @@ from qfluentwidgets import (
 )
 
 # ---------------------------------------------------------
-# IMPORT USER FUNCTIONS
+# IMPORT USER FUNCTIONS (Updated Path)
 # ---------------------------------------------------------
 try:
+    # Importing from the 'Code.SMT4ModPlant' package structure as requested
     from Code.SMT4ModPlant.GeneralRecipeParser import parse_general_recipe
     from Code.SMT4ModPlant.AASxmlCapabilityParser import parse_capabilities_robust
     from Code.SMT4ModPlant.SMT4ModPlant_main import run_optimization
 except ImportError as e:
-    print("Import Error: Please ensure GeneralRecipeParser.py, AASxmlCapabilityParser.py, SMT4ModPlant_main.py and z3-solver are in the directory.")
-    print(f"Details: {e}")
+    print("Import Error: Could not load modules.")
+    print("Please ensure the directory structure is as follows:")
+    print("  gui.py")
+    print("  Code/")
+    print("    SMT4ModPlant/")
+    print("      __init__.py (Must exist)")
+    print("      GeneralRecipeParser.py")
+    print("      AASxmlCapabilityParser.py")
+    print("      SMT4ModPlant_main.py")
+    print(f"Specific Error: {e}")
     sys.exit(1)
 
 
@@ -83,7 +90,10 @@ class SMTWorker(QThread):
             self.progress_signal.emit(20, 100)
 
             self.log_signal.emit(f"Scanning resource directory: {self.resource_dir}")
-            resource_files = [f for f in os.listdir(self.resource_dir) if f.endswith('.xml') or f.endswith('.aasx')]
+            
+            # Logic: Look for both .xml and .aasx files
+            # The backend automatically distinguishes between them.
+            resource_files = [f for f in os.listdir(self.resource_dir) if f.lower().endswith('.xml') or f.lower().endswith('.aasx')]
             
             if not resource_files:
                 raise FileNotFoundError("No .xml or .aasx files found in the selected directory.")
@@ -97,16 +107,22 @@ class SMTWorker(QThread):
                 self.log_signal.emit(f"Parsing resource file: {filename}")
                 
                 try:
+                    # The robust parser automatically detects XML vs AASX based on extension or content
+                    # If XML -> Reads directly. If AASX -> Unzips and reads XML.
                     caps = parse_capabilities_robust(full_path)
-                    key_name = f"resource: {res_name}" 
-                    all_capabilities[key_name] = caps
+                    if caps: # Ensure valid capabilities were found
+                        key_name = f"resource: {res_name}" 
+                        all_capabilities[key_name] = caps
+                    else:
+                        self.log_signal.emit(f"Warning: No capabilities found in {filename}")
+                        
                 except Exception as parse_err:
                     self.log_signal.emit(f"Warning: Failed to parse {filename}: {parse_err}")
 
                 progress = 20 + int((idx + 1) / total_files * 40)
                 self.progress_signal.emit(progress, 100)
 
-            self.log_signal.emit(f"Loaded {len(all_capabilities)} resources.")
+            self.log_signal.emit(f"Loaded {len(all_capabilities)} valid resources.")
 
             if not all_capabilities:
                 raise ValueError("No valid resources loaded. Cannot proceed.")
@@ -168,8 +184,10 @@ class ResultsPage(QWidget):
             self.table.setItem(r, 1, QTableWidgetItem(str(row_data['description'])))
             self.table.setItem(r, 2, QTableWidgetItem(str(row_data['resource'])))
             self.table.setItem(r, 3, QTableWidgetItem(str(row_data['capabilities'])))
+            
+            # Status item with theme color (Green for success)
             status_item = QTableWidgetItem(str(row_data['status']))
-            status_item.setForeground(QColor("#107C10")) 
+            status_item.setForeground(QColor("#28a745")) 
             self.table.setItem(r, 4, status_item)
 
 class HomePage(QWidget):
@@ -179,6 +197,9 @@ class HomePage(QWidget):
         self.log_callback = log_callback
         self.recipe_path = ""
         self.resource_dir = ""
+        
+        # Apply Theme Color (IAT Blue style)
+        setThemeColor("#00629B")
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
@@ -194,7 +215,10 @@ class HomePage(QWidget):
         # Card 1: Recipe
         self.card_recipe = CardWidget(self)
         l1 = QHBoxLayout(self.card_recipe)
+        
+        # Using standard DOCUMENT icon
         icon1 = IconWidget(FluentIcon.DOCUMENT, self)
+        
         v1 = QVBoxLayout()
         self.lbl_recipe = BodyLabel("General Recipe XML", self)
         self.lbl_recipe_val = CaptionLabel("No file selected", self)
@@ -210,9 +234,14 @@ class HomePage(QWidget):
         # Card 2: Resources
         self.card_res = CardWidget(self)
         l2 = QHBoxLayout(self.card_res)
+        
+        # Using standard FOLDER icon
         icon2 = IconWidget(FluentIcon.FOLDER, self)
+        
         v2 = QVBoxLayout()
-        self.lbl_res = BodyLabel("Resources Directory (AASX)", self)
+        
+        # Label updated to indicate support for both XML and AASX
+        self.lbl_res = BodyLabel("Resources Directory (XML/AASX)", self)
         self.lbl_res_val = CaptionLabel("No folder selected", self)
         v2.addWidget(self.lbl_res)
         v2.addWidget(self.lbl_res_val)
@@ -286,30 +315,25 @@ class SettingsPage(QWidget):
 
         self.title = TitleLabel("Settings", self)
         layout.addWidget(self.title)
-
-        # Theme Card
-        self.card = CardWidget(self)
-        card_layout = QHBoxLayout(self.card)
-        card_layout.setContentsMargins(20, 20, 20, 20)
-
-        icon_widget = IconWidget(FluentIcon.BRUSH, self)
-        text_layout = QVBoxLayout()
-        title_label = BodyLabel("App Theme", self)
-        desc_label = CaptionLabel("Toggle between Dark and Light mode", self)
-        text_layout.addWidget(title_label)
-        text_layout.addWidget(desc_label)
-
-        self.theme_switch = SwitchButton(self)
-        self.theme_switch.setOnText("Dark")
-        self.theme_switch.setOffText("Light")
-        self.theme_switch.setChecked(True)
-        self.theme_switch.checkedChanged.connect(self.toggle_theme)
-
-        card_layout.addWidget(icon_widget)
-        card_layout.addLayout(text_layout, 1)
-        card_layout.addWidget(self.theme_switch)
         
-        layout.addWidget(self.card)
+        # Theme Toggle
+        self.card_theme = CardWidget(self)
+        l_theme = QHBoxLayout(self.card_theme)
+        icon_theme = IconWidget(FluentIcon.BRUSH, self)
+        lbl_theme = BodyLabel("Dark Mode", self)
+        self.switch_theme = SwitchButton(self)
+        
+        # [MODIFIED] Set default to True for Dark Mode
+        self.switch_theme.setChecked(True) 
+        
+        self.switch_theme.checkedChanged.connect(self.toggle_theme)
+        
+        l_theme.addWidget(icon_theme)
+        l_theme.addWidget(lbl_theme)
+        l_theme.addStretch(1)
+        l_theme.addWidget(self.switch_theme)
+        layout.addWidget(self.card_theme)
+        
         layout.addStretch()
 
     def toggle_theme(self, checked):
@@ -326,7 +350,10 @@ class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
+        
+        # [MODIFIED] Set default theme to DARK
         setTheme(Theme.DARK)
+        
         self.resize(1000, 700)
         
         # Center Window
@@ -341,7 +368,7 @@ class MainWindow(FluentWindow):
         self.log_page = LogPage(self)
         self.settings_page = SettingsPage(self)
         
-        # Nav
+        # Navigation
         self.addSubInterface(self.home_page, FluentIcon.HOME, "Home", NavigationItemPosition.TOP)
         self.addSubInterface(self.results_page, FluentIcon.ACCEPT, "Results", NavigationItemPosition.TOP)
         self.addSubInterface(self.log_page, FluentIcon.DOCUMENT, "Log", NavigationItemPosition.TOP)

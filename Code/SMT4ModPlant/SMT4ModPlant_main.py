@@ -219,6 +219,101 @@ def is_materialflow_consistent(model, step_resource_to_caps_props, process_steps
                 
     return True
 
+def solution_to_json(model, process_steps, resources, step_resource_to_caps_props, Assignment, recipe, capabilities, solution_id):
+    """将解决方案转换为JSON格式"""
+    solution_data = {
+        "solution_id": solution_id,
+        "assignments": [],
+        "material_flow_consistent": True
+    }
+    
+    for i, step in enumerate(process_steps):
+        for j, res in enumerate(resources):
+            var = Assignment[i][j]
+            if var is not None and is_true(model[var]):
+                caps, cap_prop_pairs = step_resource_to_caps_props[i][j]
+                
+                # 构建步骤分配信息
+                assignment_info = {
+                    "step_id": step['ID'],
+                    "step_description": step['Description'],
+                    "resource": res,
+                    "capabilities": caps,
+                    "parameter_matches": []
+                }
+                
+                # 添加参数匹配信息
+                if "Parameters" in step and step["Parameters"]:
+                    for param in step["Parameters"]:
+                        param_info = {
+                            "description": param.get('Description'),
+                            "key": param.get('Key'),
+                            "unit": param.get('UnitOfMeasure'),
+                            "value": param.get('ValueString')
+                        }
+                        assignment_info["parameter_matches"].append(param_info)
+                
+                # 添加能力属性匹配信息
+                capability_details = []
+                for cap_name, matched_props in cap_prop_pairs:
+                    cap_info = {
+                        "capability_name": cap_name,
+                        "matched_properties": []
+                    }
+                    
+                    for param, prop in matched_props:
+                        prop_info = {
+                            "property_id": prop.get('property_ID'),
+                            "property_name": prop.get('property_name'),
+                            "property_unit": prop.get('property_unit'),
+                        }
+                        
+                        # 优先检查是否有离散值
+                        discrete_values = []
+                        for key in prop.keys():
+                            if key.startswith('value') and key != 'valueType' and key != 'valueMin' and key != 'valueMax':
+                                val = prop.get(key)
+                                if val is not None:
+                                    try:
+                                        # 尝试转换为数字
+                                        num_val = float(val)
+                                        discrete_values.append(num_val)
+                                    except (ValueError, TypeError):
+                                        # 如果转换失败，保留原始值
+                                        discrete_values.append(val)
+                        
+                        # 根据属性类型设置值表示
+                        value_min = prop.get('valueMin')
+                        value_max = prop.get('valueMax')
+                        
+                        if discrete_values:
+                            # 有离散值
+                            if len(discrete_values) == 1:
+                                # 只有一个离散值，当作具体值
+                                prop_info["value"] = discrete_values[0]
+                                prop_info["value_type"] = "exact"
+                            else:
+                                # 多个离散值
+                                prop_info["values"] = discrete_values
+                                prop_info["value_type"] = "discrete_set"
+                        elif value_min is not None or value_max is not None:
+                            # 有范围值
+                            prop_info["value_min"] = value_min
+                            prop_info["value_max"] = value_max
+                            prop_info["value_type"] = "range"
+                        else:
+                            # 没有值信息
+                            prop_info["value_type"] = "unspecified"
+                        
+                        cap_info["matched_properties"].append(prop_info)
+                    
+                    capability_details.append(cap_info)
+                
+                assignment_info["capability_details"] = capability_details
+                solution_data["assignments"].append(assignment_info)
+    
+    return solution_data
+
 # ---------------------------------------------------------
 # EXPORTED FUNCTION (Only this is called by GUI)
 # ---------------------------------------------------------
@@ -296,7 +391,7 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print):
             solver.add(Not(And(true_vars)))
 
     attempt_count = 0
-    max_attempts = 20
+    max_attempts = 200
     
     while s.check() == sat:
         model = s.model()
@@ -304,6 +399,11 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print):
         
         if is_materialflow_consistent(model, step_resource_to_caps_props, process_steps, resources, recipe_data, Assignment):
             log_callback(f"Solution Found (Attempt {attempt_count})!")
+            
+            # # Convert the solution to JSON format and save it.
+            # solution_json = solution_to_json(m, process_steps, resources, step_resource_to_caps_props, Assignment, recipe, capabilities, count + 1)
+            # solutions.append(solution_json)
+            
             results = []
             for i, step in enumerate(process_steps):
                 for j, res in enumerate(resources):
@@ -320,11 +420,12 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print):
             return results
         else:
             log_callback(f"Attempt {attempt_count}: Model SAT, but Material Flow inconsistent. Retrying...")
-            block_solution(s, model)
+        
+        block_solution(s, model)
             
-            if attempt_count >= max_attempts:
-                log_callback("Limit reached: Could not find a material-flow consistent solution.")
-                break
+        if attempt_count >= max_attempts:
+            log_callback("Limit reached: Could not find a material-flow consistent solution.")
+            break
 
     log_callback("UNSAT (No Solution Found).")
     return []
