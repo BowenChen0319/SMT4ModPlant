@@ -10,17 +10,10 @@ from typing import List, Dict
 # [CRITICAL FIX] macOS Bundle Startup Fixes
 # ---------------------------------------------------------
 if getattr(sys, 'frozen', False):
-    # This block only runs when packaged as an App/Exe
     bundle_dir = sys._MEIPASS
-    
-    # 1. Fix missing Z3 libraries (DYLD_LIBRARY_PATH)
-    # Allows the app to find libz3.dylib bundled inside it
     current_dyld = os.environ.get('DYLD_LIBRARY_PATH', '')
     os.environ['DYLD_LIBRARY_PATH'] = f"{bundle_dir}{os.pathsep}{current_dyld}"
     os.environ['PATH'] = f"{bundle_dir}{os.pathsep}{os.environ.get('PATH', '')}"
-    
-    # 2. Fix "Print Crash" (Stdout/Stderr Redirection) - SILENT MODE
-    # Redirect output to "null" to prevent crash without creating a file on Desktop
     try:
         sys.stdout = open(os.devnull, "w")
         sys.stderr = open(os.devnull, "w")
@@ -28,9 +21,8 @@ if getattr(sys, 'frozen', False):
         pass
 
 # ---------------------------------------------------------
-# NORMAL IMPORTS
+# IMPORTS
 # ---------------------------------------------------------
-# PyQt6
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QTextCursor, QBrush
 from PyQt6.QtWidgets import (
@@ -39,32 +31,25 @@ from PyQt6.QtWidgets import (
     QFileDialog
 )
 
-# Fluent Widgets
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, PrimaryPushButton, PushButton,
     TextEdit, InfoBar, InfoBarPosition, setTheme, Theme, setThemeColor,
     FluentIcon, CardWidget, IconWidget, BodyLabel, CaptionLabel,
-    SwitchButton, TableWidget, TitleLabel, SubtitleLabel 
+    SwitchButton, TableWidget, TitleLabel, SubtitleLabel, Slider,
+    DoubleSpinBox
 )
 
 # ---------------------------------------------------------
-# IMPORT USER FUNCTIONS (Updated Path)
+# IMPORT USER FUNCTIONS
 # ---------------------------------------------------------
 try:
-    # Importing from the 'Code.SMT4ModPlant' package structure as requested
     from Code.SMT4ModPlant.GeneralRecipeParser import parse_general_recipe
     from Code.SMT4ModPlant.AASxmlCapabilityParser import parse_capabilities_robust
     from Code.SMT4ModPlant.SMT4ModPlant_main import run_optimization
+    from Code.Optimizer.Optimization import SolutionOptimizer
 except ImportError as e:
     print("Import Error: Could not load modules.")
-    print("Please ensure the directory structure is as follows:")
-    print("  gui.py")
-    print("  Code/")
-    print("    SMT4ModPlant/")
-    print("      __init__.py (Must exist)")
-    print("      GeneralRecipeParser.py")
-    print("      AASxmlCapabilityParser.py")
-    print("      SMT4ModPlant_main.py")
+    print("Ensure Code/SMT4ModPlant and Code/Optimizer directories exist.")
     print(f"Specific Error: {e}")
     sys.exit(1)
 
@@ -78,22 +63,21 @@ class SMTWorker(QThread):
     finished_signal = pyqtSignal(list)
     error_signal = pyqtSignal(str)
 
-    def __init__(self, recipe_path, resource_dir, find_all_solutions):
+    def __init__(self, recipe_path, resource_dir, mode_index, weights):
         super().__init__()
         self.recipe_path = recipe_path
         self.resource_dir = resource_dir
-        self.find_all_solutions = find_all_solutions
+        self.mode_index = mode_index # 0:Fast, 1:Pro, 2:Ultra
+        self.weights = weights # (energy, use, co2)
 
     def run(self):
         try:
+            # 1. Parsing
             self.log_signal.emit(f"Parsing Recipe: {self.recipe_path}")
             recipe_data = parse_general_recipe(self.recipe_path)
-            self.progress_signal.emit(20, 100)
+            self.progress_signal.emit(10, 100)
 
             self.log_signal.emit(f"Scanning resource directory: {self.resource_dir}")
-            
-            # Logic: Look for both .xml and .aasx files
-            # The backend automatically distinguishes between them.
             resource_files = [f for f in os.listdir(self.resource_dir) if f.lower().endswith('.xml') or f.lower().endswith('.aasx')]
             
             if not resource_files:
@@ -108,39 +92,81 @@ class SMTWorker(QThread):
                 self.log_signal.emit(f"Parsing resource file: {filename}")
                 
                 try:
-                    # The robust parser automatically detects XML vs AASX based on extension or content
-                    # If XML -> Reads directly. If AASX -> Unzips and reads XML.
                     caps = parse_capabilities_robust(full_path)
-                    if caps: # Ensure valid capabilities were found
+                    if caps:
                         key_name = f"resource: {res_name}" 
                         all_capabilities[key_name] = caps
-                    else:
-                        self.log_signal.emit(f"Warning: No capabilities found in {filename}")
-                        
                 except Exception as parse_err:
                     self.log_signal.emit(f"Warning: Failed to parse {filename}: {parse_err}")
 
-                progress = 20 + int((idx + 1) / total_files * 40)
+                progress = 10 + int((idx + 1) / total_files * 20)
                 self.progress_signal.emit(progress, 100)
 
             self.log_signal.emit(f"Loaded {len(all_capabilities)} valid resources.")
+            if not all_capabilities: raise ValueError("No valid resources loaded.")
 
-            if not all_capabilities:
-                raise ValueError("No valid resources loaded. Cannot proceed.")
-
-            self.log_signal.emit("Starting SMT Optimization (Z3)...")
+            # 2. SMT Logic Configuration
+            find_all = (self.mode_index >= 1) # Pro or Ultra
+            is_ultra = (self.mode_index == 2)
             
-            # Pass the switch value to the backend
-            results = run_optimization(
+            self.log_signal.emit(f"Starting SMT Logic (Mode: {['Fast', 'Pro', 'Ultra'][self.mode_index]})...")
+            
+            # SMT run
+            gui_results, json_solutions = run_optimization(
                 recipe_data, 
                 all_capabilities, 
                 log_callback=self.log_signal.emit, 
-                generate_json=True,
-                find_all_solutions=self.find_all_solutions
+                generate_json=is_ultra, 
+                find_all_solutions=find_all
             )
             
+            self.progress_signal.emit(60, 100)
+
+            # 3. Ultra Optimization Logic
+            if is_ultra and json_solutions:
+                self.log_signal.emit("Ultra Mode: Calculating costs and finding optimal solution...")
+                
+                optimizer = SolutionOptimizer()
+                # Set weights from settings
+                optimizer.set_weights(*self.weights)
+                # Load resource costs from the directory
+                optimizer.load_resource_costs_from_dir(self.resource_dir)
+                
+                # Optimize from memory
+                evaluated_solutions = optimizer.optimize_solutions_from_memory(json_solutions)
+                
+                # Create a map for easy lookup: solution_id -> evaluation_result
+                score_map = {sol['solution_id']: sol for sol in evaluated_solutions}
+                
+                # Merge scores into gui_results
+                # gui_results contains rows for each step. We need to inject score info into each row.
+                # Also we need to reorder gui_results based on the sorted order in evaluated_solutions.
+                
+                sorted_gui_results = []
+                
+                # evaluated_solutions is already sorted by score (best first)
+                for eval_sol in evaluated_solutions:
+                    sol_id = eval_sol['solution_id']
+                    
+                    # Find all rows in gui_results matching this sol_id
+                    rows = [r for r in gui_results if r.get('solution_id') == sol_id]
+                    
+                    # Add separator if not first
+                    if sorted_gui_results: sorted_gui_results.append({})
+                    
+                    # Inject score data into rows and append
+                    for row in rows:
+                        row['composite_score'] = eval_sol['composite_score']
+                        row['energy_cost'] = eval_sol['total_energy_cost']
+                        row['use_cost'] = eval_sol['total_use_cost']
+                        row['co2_footprint'] = eval_sol['total_co2_footprint']
+                        sorted_gui_results.append(row)
+                
+                gui_results = sorted_gui_results
+                self.log_signal.emit(f"Optimization complete. Best Solution ID: {evaluated_solutions[0]['solution_id']}")
+
             self.progress_signal.emit(100, 100)
-            self.finished_signal.emit(results)
+            self.finished_signal.emit(gui_results)
 
         except Exception as e:
             self.error_signal.emit(str(e))
@@ -174,64 +200,83 @@ class ResultsPage(QWidget):
         self.title = SubtitleLabel("Matching Results", self)
         
         self.table = TableWidget(self)
-        # Increased column count to 6 to include Solution ID
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Sol ID", "Step ID", "Description", "Assigned Resource", "Capabilities (Params)", "Status"])
         self.table.verticalHeader().setVisible(False)
         self.table.setBorderVisible(True)
-        
-        # [NEW] Enable word wrap and auto row height for multiline capability details
         self.table.setWordWrap(True)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch) # Capabilities column stretch
         
         layout.addWidget(self.title)
         layout.addWidget(self.table, 1)
 
     def update_table(self, data: List[Dict]):
-        self.table.setRowCount(len(data))
-        for r, row_data in enumerate(data):
+        # Determine if we have score data (Ultra mode)
+        has_score = False
+        if data and len(data) > 0:
+            # Check first non-empty row
+            for row in data:
+                if row:
+                    if 'composite_score' in row: has_score = True
+                    break
+        
+        # Configure Columns
+        if has_score:
+            headers = ["Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
+            self.table.setColumnCount(9)
+        else:
+            headers = ["Sol ID", "Step", "Description", "Resource", "Capabilities", "Status"]
+            self.table.setColumnCount(6)
             
-            # Check if this is a separator row (empty dict)
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        
+        # Stretch capabilities column
+        cap_col_idx = 5 if has_score else 4
+        self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.Stretch)
+
+        self.table.setRowCount(len(data))
+        
+        for r, row_data in enumerate(data):
+            # Separator
             if not row_data:
-                # Fill the row with empty, disabled items to create a visual break
-                for c in range(6):
+                for c in range(self.table.columnCount()):
                     item = QTableWidgetItem("")
-                    item.setFlags(Qt.ItemFlag.NoItemFlags) # Disable selection
+                    item.setFlags(Qt.ItemFlag.NoItemFlags)
                     self.table.setItem(r, c, item)
                 continue
 
-            # Regular Data Row
-            # Col 0: Solution ID
-            self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
-            # Col 1: Step ID
-            self.table.setItem(r, 1, QTableWidgetItem(str(row_data['step_id'])))
-            # Col 2: Description
-            self.table.setItem(r, 2, QTableWidgetItem(str(row_data['description'])))
-            # Col 3: Resource
-            self.table.setItem(r, 3, QTableWidgetItem(str(row_data['resource'])))
-            # Col 4: Capabilities (Now multiline with params)
-            self.table.setItem(r, 4, QTableWidgetItem(str(row_data['capabilities'])))
-            
-            # Col 5: Status (Green)
-            status_item = QTableWidgetItem(str(row_data['status']))
-            status_item.setForeground(QColor("#28a745")) 
-            self.table.setItem(r, 5, status_item)
+            # Fill Data
+            if has_score:
+                # ["Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
+                self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
+                self.table.setItem(r, 1, QTableWidgetItem(f"{row_data.get('composite_score', 0):.2f}"))
+                self.table.setItem(r, 2, QTableWidgetItem(str(row_data['step_id'])))
+                self.table.setItem(r, 3, QTableWidgetItem(str(row_data['description'])))
+                self.table.setItem(r, 4, QTableWidgetItem(str(row_data['resource'])))
+                self.table.setItem(r, 5, QTableWidgetItem(str(row_data['capabilities'])))
+                self.table.setItem(r, 6, QTableWidgetItem(f"{row_data.get('energy_cost', 0):.1f}"))
+                self.table.setItem(r, 7, QTableWidgetItem(f"{row_data.get('use_cost', 0):.1f}"))
+                self.table.setItem(r, 8, QTableWidgetItem(f"{row_data.get('co2_footprint', 0):.1f}"))
+            else:
+                # ["Sol ID", "Step", "Description", "Resource", "Capabilities", "Status"]
+                self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
+                self.table.setItem(r, 1, QTableWidgetItem(str(row_data['step_id'])))
+                self.table.setItem(r, 2, QTableWidgetItem(str(row_data['description'])))
+                self.table.setItem(r, 3, QTableWidgetItem(str(row_data['resource'])))
+                self.table.setItem(r, 4, QTableWidgetItem(str(row_data['capabilities'])))
+                status_item = QTableWidgetItem(str(row_data['status']))
+                status_item.setForeground(QColor("#28a745"))
+                self.table.setItem(r, 5, status_item)
         
-        # Ensure rows adjust to content height
         self.table.resizeRowsToContents()
 
 class HomePage(QWidget):
-    def __init__(self, log_callback, parent=None):
+    def __init__(self, log_callback, settings_page, parent=None):
         super().__init__(parent)
         self.setObjectName("home_page")
         self.log_callback = log_callback
+        self.settings_page = settings_page # Reference to settings to get weights
         self.recipe_path = ""
         self.resource_dir = ""
         
-        # Apply Theme Color (IAT Blue style)
         setThemeColor("#00629B")
         
         layout = QVBoxLayout(self)
@@ -241,11 +286,10 @@ class HomePage(QWidget):
         title = TitleLabel("SMT4ModPlant Orchestrator", self)
         desc = CaptionLabel("Resource matching tool based on General Recipe and AAS Capabilities.", self)
         desc.setStyleSheet("color: #666;") 
-        
         layout.addWidget(title)
         layout.addWidget(desc)
 
-        # Card 1: Recipe
+        # File Inputs
         self.card_recipe = CardWidget(self)
         l1 = QHBoxLayout(self.card_recipe)
         icon1 = IconWidget(FluentIcon.DOCUMENT, self)
@@ -261,7 +305,6 @@ class HomePage(QWidget):
         l1.addWidget(btn1)
         layout.addWidget(self.card_recipe)
 
-        # Card 2: Resources
         self.card_res = CardWidget(self)
         l2 = QHBoxLayout(self.card_res)
         icon2 = IconWidget(FluentIcon.FOLDER, self)
@@ -277,40 +320,44 @@ class HomePage(QWidget):
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
-        # --- [NEW] Solver Options Card ---
+        # --- [MODIFIED] Mode Slider ---
         self.card_opts = CardWidget(self)
         l_opts = QHBoxLayout(self.card_opts)
-        icon_opts = IconWidget(FluentIcon.SEARCH, self)
+        icon_opts = IconWidget(FluentIcon.SPEED_HIGH, self)
         
-        # Switch for "Find All Solutions"
-        self.lbl_opts = BodyLabel("Find All Valid Solutions", self)
-        self.lbl_opts_desc = CaptionLabel("If off, stops after finding the first valid match.", self)
         v_opts = QVBoxLayout()
+        self.lbl_opts = BodyLabel("Optimization Mode", self)
+        self.lbl_opts_desc = CaptionLabel("Fast (1 Sol)  |  Pro (All Sols)  |  Ultra (Optimal)", self)
         v_opts.addWidget(self.lbl_opts)
         v_opts.addWidget(self.lbl_opts_desc)
         
-        self.switch_all_sol = SwitchButton(self)
-        self.switch_all_sol.setChecked(True) # Default: Find All
+        # Slider Logic
+        self.slider_mode = Slider(Qt.Orientation.Horizontal, self)
+        self.slider_mode.setRange(0, 2)
+        self.slider_mode.setValue(1) # Default Pro
+        self.slider_mode.setFixedWidth(200)
+        # Update label on change
+        self.slider_mode.valueChanged.connect(self.update_mode_label)
         
         l_opts.addWidget(icon_opts)
         l_opts.addLayout(v_opts, 1)
-        l_opts.addWidget(self.switch_all_sol)
-        
+        l_opts.addWidget(self.slider_mode)
         layout.addWidget(self.card_opts)
         # ---------------------------------
 
-        # Actions
         self.btn_run = PrimaryPushButton("Start Calculation", self)
         self.btn_run.setEnabled(False)
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
 
-        # Progress
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
         layout.addWidget(self.pbar)
-        
         layout.addStretch()
+
+    def update_mode_label(self, val):
+        modes = ["Fast (Single)", "Pro (All Valid)", "Ultra (Optimized)"]
+        self.lbl_opts_desc.setText(modes[val])
 
     def select_recipe(self):
         f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
@@ -334,10 +381,11 @@ class HomePage(QWidget):
         self.btn_run.setEnabled(False)
         self.log_callback("Starting Process...")
         
-        # [NEW] Pass the switch state to the worker
-        find_all = self.switch_all_sol.isChecked()
+        mode = self.slider_mode.value()
+        # Get weights from settings page
+        weights = self.settings_page.get_weights()
         
-        self.worker = SMTWorker(self.recipe_path, self.resource_dir, find_all)
+        self.worker = SMTWorker(self.recipe_path, self.resource_dir, mode, weights)
         self.worker.log_signal.connect(self.log_callback)
         self.worker.progress_signal.connect(lambda c, t: (self.pbar.setMaximum(t), self.pbar.setValue(c)))
         self.worker.error_signal.connect(lambda e: InfoBar.error(title="Error", content=e, parent=self.window()))
@@ -363,7 +411,6 @@ class SettingsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
-
         self.title = TitleLabel("Settings", self)
         layout.addWidget(self.title)
         
@@ -373,25 +420,53 @@ class SettingsPage(QWidget):
         icon_theme = IconWidget(FluentIcon.BRUSH, self)
         lbl_theme = BodyLabel("Dark Mode", self)
         self.switch_theme = SwitchButton(self)
-        
-        # Set default to True for Dark Mode
         self.switch_theme.setChecked(True) 
-        
         self.switch_theme.checkedChanged.connect(self.toggle_theme)
-        
         l_theme.addWidget(icon_theme)
         l_theme.addWidget(lbl_theme)
         l_theme.addStretch(1)
         l_theme.addWidget(self.switch_theme)
         layout.addWidget(self.card_theme)
         
+        # --- [NEW] Optimization Weights ---
+        self.card_weights = CardWidget(self)
+        l_weights = QVBoxLayout(self.card_weights)
+        l_weights.setContentsMargins(20, 20, 20, 20)
+        
+        w_title = SubtitleLabel("Optimization Weights", self)
+        l_weights.addWidget(w_title)
+        
+        # Helper to create weight row
+        def create_weight_row(label, default_val):
+            row = QHBoxLayout()
+            lbl = BodyLabel(label, self)
+            spin = DoubleSpinBox(self)
+            spin.setRange(0.0, 1.0)
+            spin.setSingleStep(0.1)
+            spin.setValue(default_val)
+            row.addWidget(lbl)
+            row.addStretch(1)
+            row.addWidget(spin)
+            return row, spin
+            
+        r1, self.spin_energy = create_weight_row("Energy Cost Weight", 0.4)
+        r2, self.spin_use = create_weight_row("Use Cost Weight", 0.3)
+        r3, self.spin_co2 = create_weight_row("CO2 Footprint Weight", 0.3)
+        
+        l_weights.addLayout(r1)
+        l_weights.addLayout(r2)
+        l_weights.addLayout(r3)
+        layout.addWidget(self.card_weights)
+        # ---------------------------------
+        
         layout.addStretch()
 
     def toggle_theme(self, checked):
-        if checked:
-            setTheme(Theme.DARK)
-        else:
-            setTheme(Theme.LIGHT)
+        if checked: setTheme(Theme.DARK)
+        else: setTheme(Theme.LIGHT)
+        
+    def get_weights(self):
+        return (self.spin_energy.value(), self.spin_use.value(), self.spin_co2.value())
 
 # ---------------------------------------------------------
 # MAIN WINDOW
@@ -401,25 +476,20 @@ class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
-        
-        # Set default theme to DARK
         setTheme(Theme.DARK)
+        self.resize(1100, 750) # Widen slightly for extra columns
         
-        self.resize(1000, 700)
-        
-        # Center Window
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             self.move(geo.width()//2 - self.width()//2, geo.height()//2 - self.height()//2)
         
-        # Pages
-        self.home_page = HomePage(self.log_callback_shim, self)
-        self.results_page = ResultsPage(self)
-        self.log_page = LogPage(self)
+        # Init Pages (Create settings first to pass to home)
         self.settings_page = SettingsPage(self)
+        self.log_page = LogPage(self)
+        self.results_page = ResultsPage(self)
+        self.home_page = HomePage(self.log_callback_shim, self.settings_page, self)
         
-        # Navigation
         self.addSubInterface(self.home_page, FluentIcon.HOME, "Home", NavigationItemPosition.TOP)
         self.addSubInterface(self.results_page, FluentIcon.ACCEPT, "Results", NavigationItemPosition.TOP)
         self.addSubInterface(self.log_page, FluentIcon.DOCUMENT, "Log", NavigationItemPosition.TOP)

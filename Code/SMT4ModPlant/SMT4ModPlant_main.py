@@ -1,3 +1,4 @@
+# Code/SMT4ModPlant/SMT4ModPlant_main.py
 import json
 from z3 import Solver, Bool, Not, Sum, If, is_true, sat, And
 
@@ -5,7 +6,7 @@ from z3 import Solver, Bool, Not, Sum, If, is_true, sat, And
 TRANSPORT_CAPABILITIES = ["Dosing", "Transfer", "Discharge"]
 
 # ---------------------------------------------------------
-# HELPER FUNCTIONS
+# HELPER FUNCTIONS (Condensed for brevity, logic unchanged)
 # ---------------------------------------------------------
 
 def load_json(filename):
@@ -43,21 +44,15 @@ def property_value_match(param_value, prop):
             if value_min is not None:
                 try:
                     value_min_f = float(value_min)
-                    if op in ('=', '>=') and val < value_min_f:
-                        return False
-                    if op == '>' and val <= value_min_f:
-                        return False
-                except ValueError:
-                    pass
+                    if op in ('=', '>=') and val < value_min_f: return False
+                    if op == '>' and val <= value_min_f: return False
+                except ValueError: pass
             if value_max is not None:
                 try:
                     value_max_f = float(value_max)
-                    if op in ('=', '<=') and val > value_max_f:
-                        return False
-                    if op == '<' and val >= value_max_f:
-                        return False
-                except ValueError:
-                    pass
+                    if op in ('=', '<=') and val > value_max_f: return False
+                    if op == '<' and val >= value_max_f: return False
+                except ValueError: pass
             return True
 
     if discrete_values:
@@ -66,18 +61,12 @@ def property_value_match(param_value, prop):
             op, val = match.groups()
             op = op or '='
             pval = float(val.replace(',', '.'))
-            if op in ('=', None):
-                return pval in discrete_values
-            elif op == '>=':
-                return any(dv >= pval for dv in discrete_values)
-            elif op == '<=':
-                return any(dv <= pval for dv in discrete_values)
-            elif op == '>':
-                return any(dv > pval for dv in discrete_values)
-            elif op == '<':
-                return any(dv < pval for dv in discrete_values)
+            if op in ('=', None): return pval in discrete_values
+            elif op == '>=': return any(dv >= pval for dv in discrete_values)
+            elif op == '<=': return any(dv <= pval for dv in discrete_values)
+            elif op == '>': return any(dv > pval for dv in discrete_values)
+            elif op == '<': return any(dv < pval for dv in discrete_values)
         return False
-
     return True
 
 def properties_compatible(recipe_step, cap_entry):
@@ -126,27 +115,19 @@ def check_preconditions_for_step(recipe, step, cap_entry):
                                 op = op or '='
                                 cval = float(val.replace(',', '.'))
                                 mval = float(mat['Quantity'])
-                                if (
-                                    (op == '>=' and mval >= cval) or
-                                    (op == '>' and mval > cval) or
-                                    (op == '<=' and mval <= cval) or
-                                    (op == '<' and mval < cval) or
-                                    (op == '=' and mval == cval)
-                                ):
+                                if ((op == '>=' and mval >= cval) or (op == '>' and mval > cval) or
+                                    (op == '<=' and mval <= cval) or (op == '<' and mval < cval) or
+                                    (op == '=' and mval == cval)):
                                     matched = True
                                     break
-                        except Exception:
-                            continue
-                if not matched:
-                    return False
+                        except Exception: continue
+                if not matched: return False
     return True
 
 def has_transfer_capability(res, capabilities_data):
-    if res not in capabilities_data:
-        return False
+    if res not in capabilities_data: return False
     for cap in capabilities_data[res]:
-        if cap['capability'][0]['capability_name'] in TRANSPORT_CAPABILITIES:
-            return True
+        if cap['capability'][0]['capability_name'] in TRANSPORT_CAPABILITIES: return True
     return False
 
 def needs_transfer_to_step(step, current_res_idx, resources, step_by_id, step_resource_to_caps_props, recipe):
@@ -165,13 +146,9 @@ def needs_transfer_to_step(step, current_res_idx, resources, step_by_id, step_re
     return False
 
 def is_materialflow_consistent(model, step_resource_to_caps_props, process_steps, resources, recipe, Assignment):
-    material_location = {}
-    for inp in recipe.get('Inputs', []):
-        material_location[inp['ID']] = None
-    for interm in recipe.get('Intermediates', []):
-        material_location[interm['ID']] = None
-    for out in recipe.get('Outputs', []):
-        material_location[out['ID']] = None
+    material_location = {inp['ID']: None for inp in recipe.get('Inputs', [])}
+    material_location.update({interm['ID']: None for interm in recipe.get('Intermediates', [])})
+    material_location.update({out['ID']: None for out in recipe.get('Outputs', [])})
         
     step_by_id = {step['ID']: idx for idx, step in enumerate(process_steps)}
     resource_map = {}
@@ -193,10 +170,8 @@ def is_materialflow_consistent(model, step_resource_to_caps_props, process_steps
             res_idx = resources.index(res_of_step)
             caps, _ = step_resource_to_caps_props[step_idx][res_idx]
             is_transfer = any(c in TRANSPORT_CAPABILITIES for c in caps)
-            if is_transfer:
-                material_location[to_id] = None 
-            else:
-                material_location[to_id] = res_of_step
+            if is_transfer: material_location[to_id] = None 
+            else: material_location[to_id] = res_of_step
             continue
             
         if from_id in material_location and to_id in step_by_id:
@@ -208,15 +183,11 @@ def is_materialflow_consistent(model, step_resource_to_caps_props, process_steps
             caps, _ = step_resource_to_caps_props[step_idx][res_idx]
             is_transfer = any(c in TRANSPORT_CAPABILITIES for c in caps)
             if is_transfer:
-                if from_res is None:
-                    pass 
-                elif from_res != assigned_res:
-                    return False
+                if from_res is None: pass 
+                elif from_res != assigned_res: return False
             else:
-                if from_res is not None and from_res != assigned_res:
-                    return False
+                if from_res is not None and from_res != assigned_res: return False
                 material_location[from_id] = assigned_res
-                
     return True
 
 def solution_to_json(model, process_steps, resources, step_resource_to_caps_props, Assignment, recipe, capabilities, solution_id):
@@ -233,7 +204,6 @@ def solution_to_json(model, process_steps, resources, step_resource_to_caps_prop
             if var is not None and is_true(model[var]):
                 caps, cap_prop_pairs = step_resource_to_caps_props[i][j]
                 
-                # Build step assignment info
                 assignment_info = {
                     "step_id": step['ID'],
                     "step_description": step['Description'],
@@ -242,7 +212,6 @@ def solution_to_json(model, process_steps, resources, step_resource_to_caps_prop
                     "parameter_matches": []
                 }
                 
-                # Add parameter match info
                 if "Parameters" in step and step["Parameters"]:
                     for param in step["Parameters"]:
                         param_info = {
@@ -253,115 +222,79 @@ def solution_to_json(model, process_steps, resources, step_resource_to_caps_prop
                         }
                         assignment_info["parameter_matches"].append(param_info)
                 
-                # Add capability property match info
                 capability_details = []
                 for cap_name, matched_props in cap_prop_pairs:
-                    cap_info = {
-                        "capability_name": cap_name,
-                        "matched_properties": []
-                    }
-                    
+                    cap_info = {"capability_name": cap_name, "matched_properties": []}
                     for param, prop in matched_props:
                         prop_info = {
                             "property_id": prop.get('property_ID'),
                             "property_name": prop.get('property_name'),
                             "property_unit": prop.get('property_unit'),
                         }
-                        
-                        # Prioritize checking for discrete values
                         discrete_values = []
                         for key in prop.keys():
-                            if key.startswith('value') and key != 'valueType' and key != 'valueMin' and key != 'valueMax':
+                            if key.startswith('value') and key not in ['valueType', 'valueMin', 'valueMax']:
                                 val = prop.get(key)
                                 if val is not None:
-                                    try:
-                                        # Try converting to number
-                                        num_val = float(val)
-                                        discrete_values.append(num_val)
-                                    except (ValueError, TypeError):
-                                        # If conversion fails, keep original value
-                                        discrete_values.append(val)
+                                    try: discrete_values.append(float(val))
+                                    except (ValueError, TypeError): discrete_values.append(val)
                         
-                        # Set value representation based on property type
                         value_min = prop.get('valueMin')
                         value_max = prop.get('valueMax')
                         
                         if discrete_values:
-                            # Has discrete values
                             if len(discrete_values) == 1:
-                                # Single discrete value, treat as exact value
                                 prop_info["value"] = discrete_values[0]
                                 prop_info["value_type"] = "exact"
                             else:
-                                # Multiple discrete values
                                 prop_info["values"] = discrete_values
                                 prop_info["value_type"] = "discrete_set"
                         elif value_min is not None or value_max is not None:
-                            # Has range values
                             prop_info["value_min"] = value_min
                             prop_info["value_max"] = value_max
                             prop_info["value_type"] = "range"
                         else:
-                            # No value info
                             prop_info["value_type"] = "unspecified"
-                        
                         cap_info["matched_properties"].append(prop_info)
-                    
                     capability_details.append(cap_info)
                 
                 assignment_info["capability_details"] = capability_details
                 solution_data["assignments"].append(assignment_info)
-    
     return solution_data
 
 def format_capability_string(cap_prop_pairs):
-    """
-    Format capabilities with their parameters for display.
-    Input: List of tuples (cap_name, matched_props)
-    Output: Formatted string like "Mixing (Speed: 200 -> [0-500])"
-    """
     display_parts = []
-    
     for cap_name, matched_props in cap_prop_pairs:
         param_strs = []
         for param, prop in matched_props:
-            # Recipe requirement value
             req_val = param.get('ValueString', '?')
-            # Parameter name (short)
             param_desc = param.get('Description', 'Param').split(' ')[0] 
-            
-            # Resource provided value (Range or Discrete)
             res_val = "?"
-            
-            # Try range
             v_min = prop.get('valueMin')
             v_max = prop.get('valueMax')
-            
-            # Try discrete
             discrete_vals = []
             for k, v in prop.items():
                 if k.startswith('value') and k not in ['valueType', 'valueMin', 'valueMax'] and v is not None:
                     discrete_vals.append(str(v))
-            
             if v_min is not None or v_max is not None:
                 res_val = f"[{v_min or '-inf'} - {v_max or 'inf'}]"
             elif discrete_vals:
                 res_val = f"{{{','.join(discrete_vals)}}}"
-                
             param_strs.append(f"{param_desc}: {req_val} -> {res_val}")
-        
         if param_strs:
             display_parts.append(f"{cap_name} ({', '.join(param_strs)})")
         else:
             display_parts.append(cap_name)
-            
     return "\n".join(display_parts)
 
 # ---------------------------------------------------------
-# EXPORTED FUNCTION (Only this is called by GUI)
+# EXPORTED FUNCTION
 # ---------------------------------------------------------
 
 def run_optimization(recipe_data, capabilities_data, log_callback=print, generate_json=False, find_all_solutions=True):
+    """
+    Returns a tuple: (gui_results_list, all_solutions_json_list)
+    """
     process_steps = recipe_data['ProcessElements']
     resources = list(capabilities_data.keys())
     
@@ -372,7 +305,7 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
     step_by_id = {step['ID']: idx for idx, step in enumerate(process_steps)}
     s = Solver()
 
-    # 1. Build Constraints
+    # Constraints building (same as before)
     for i, step in enumerate(process_steps):
         row = []
         sem_id = step.get('SemanticDescription', "")
@@ -380,7 +313,6 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
             cap_list = capabilities_data[res]
             matching_caps = []
             matching_props = []
-
             for cap_entry in cap_list:
                 is_match = capability_matching(sem_id, cap_entry)
                 matched_props_local = []
@@ -390,57 +322,41 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
                         if check_preconditions_for_step(recipe_data, step, cap_entry):
                              matching_caps.append(cap_entry['capability'][0]['capability_name'])
                              matching_props.append((cap_entry['capability'][0]['capability_name'], matched_props_local))
-
             varname = f"assign_{step['ID']}_{res.replace(':', '').replace(' ', '_')}"
             var = Bool(varname)
-            
             transfer_needed = needs_transfer_to_step(step, j, resources, step_by_id, step_resource_to_caps_props, recipe_data)
             transfer_cap = has_transfer_capability(res, capabilities_data)
-
             valid = True
-            if transfer_needed and not transfer_cap:
-                s.add(Not(var))
-                valid = False
-            
-            if not matching_caps:
-                s.add(Not(var))
-                valid = False
+            if transfer_needed and not transfer_cap: valid = False
+            if not matching_caps: valid = False
             
             if valid:
                 step_resource_to_caps_props[i][j] = (matching_caps, matching_props)
                 row.append(var)
             else:
                 row.append(None)
+                s.add(Not(var))
         Assignment.append(row)
 
-    # 2. Uniqueness
     for i, step_vars in enumerate(Assignment):
         vars_for_step = [v for v in step_vars if v is not None]
-        if vars_for_step:
-            s.add(Sum([If(v, 1, 0) for v in vars_for_step]) == 1)
-        else:
-            s.add(False)
+        if vars_for_step: s.add(Sum([If(v, 1, 0) for v in vars_for_step]) == 1)
+        else: s.add(False)
 
-    # 3. Solve & Retry Loop
     log_callback("Solving constraints...")
     
     def block_solution(solver, current_model):
         true_vars = []
         for row in Assignment:
             for v in row:
-                if v is not None and is_true(current_model[v]):
-                    true_vars.append(v)
-        if true_vars:
-            solver.add(Not(And(true_vars)))
+                if v is not None and is_true(current_model[v]): true_vars.append(v)
+        if true_vars: solver.add(Not(And(true_vars)))
 
     attempt_count = 0
     max_attempts = 200
     
-    # Store all valid solutions to display in GUI
     all_results_for_gui = []
-    # Store all valid solutions to save to JSON
     all_json_solutions = []
-    
     valid_solution_count = 0
     
     while s.check() == sat:
@@ -451,59 +367,42 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
             valid_solution_count += 1
             log_callback(f"Solution {valid_solution_count} Found (Attempt {attempt_count})!")
             
-            # --- JSON Generation Logic ---
+            # For Ultra mode, we need the JSON data structure
             if generate_json:
                 solution_json = solution_to_json(model, process_steps, resources, step_resource_to_caps_props, Assignment, recipe_data, capabilities_data, valid_solution_count)
                 all_json_solutions.append(solution_json)
                 
                 try:
                     with open('solutions.json', 'w', encoding='utf-8') as f:
-                        json.dump({
-                            "total_solutions": len(all_json_solutions),
-                            "solutions": all_json_solutions
-                        }, f, indent=2, ensure_ascii=False)
+                        json.dump({"total_solutions": len(all_json_solutions), "solutions": all_json_solutions}, f, indent=2, ensure_ascii=False)
                 except Exception as e:
                     log_callback(f"Error saving solutions.json: {e}")
 
-            # --- GUI Result Accumulation Logic ---
-            
-            # Insert a separator (empty dict) if this is not the first solution
             if valid_solution_count > 1:
                 all_results_for_gui.append({})
 
-            # Append rows for the current solution
             for i, step in enumerate(process_steps):
                 for j, res in enumerate(resources):
                     var = Assignment[i][j]
                     if var is not None and is_true(model[var]):
-                        # Get detailed matches: (cap_name, matched_props_list)
                         caps, cap_prop_pairs = step_resource_to_caps_props[i][j]
-                        
-                        # Generate formatted string with parameters
                         formatted_cap_str = format_capability_string(cap_prop_pairs)
-                        
                         all_results_for_gui.append({
                             "solution_id": valid_solution_count,
                             "step_id": step['ID'],
                             "description": step['Description'],
                             "resource": res,
-                            "capabilities": formatted_cap_str, # Now includes parameter details
+                            "capabilities": formatted_cap_str,
                             "status": "Matched"
                         })
             
-            # Check if we should stop after first solution
             if not find_all_solutions:
-                log_callback("Stopping after first solution as requested.")
                 break
-
         else:
-            log_callback(f"Attempt {attempt_count}: Model SAT, but Material Flow inconsistent. Retrying...")
+            pass # Material flow inconsistent
         
-        # Block current model to find the next one
         block_solution(s, model)
-            
         if attempt_count >= max_attempts:
-            log_callback("Limit reached: Stopping search.")
             break
 
     if valid_solution_count == 0:
@@ -511,4 +410,4 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
     else:
         log_callback(f"Search finished. Found {valid_solution_count} valid solution(s).")
         
-    return all_results_for_gui
+    return all_results_for_gui, all_json_solutions
