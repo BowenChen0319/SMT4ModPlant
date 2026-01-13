@@ -1,11 +1,11 @@
 {
-    "resource: HC10": [
+    "resource: 2025-04_HC19": [
         {
             "capability": [
                 {
                     "capability_name": "HeatingControlled",
                     "capability_comment": "Setting a temperature for heating the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#HeatingControlled"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#HeatingControlled"
                 }
             ],
             "properties": [
@@ -15,8 +15,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/Temperature",
                     "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
                     "valueType": "xs:double",
-                    "valueMin": "0",
-                    "valueMax": "100",
+                    "valueMin": "24.13",
+                    "valueMax": "62.64",
                     "propertyRealizedBy": "c02489f4-4374-41b8-97a5-ac588815aac8",
                     "property_constraint": []
                 },
@@ -26,8 +26,8 @@
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
-                    "valueMin": "0",
-                    "valueMax": "600",
+                    "valueMin": "70",
+                    "valueMax": "543",
                     "propertyRealizedBy": "5d28499a-55b3-4603-8b3a-08b5fac26edc",
                     "property_constraint": []
                 }
@@ -44,7 +44,7 @@
                 {
                     "capability_name": "HeatingPWM",
                     "capability_comment": "Heating with PWM and setting a temperature for heating the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#HeatingPWM"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#HeatingPWM"
                 }
             ],
             "properties": [
@@ -54,8 +54,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/Temperature",
                     "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
                     "valueType": "xs:double",
-                    "valueMin": "0",
-                    "valueMax": "100",
+                    "valueMin": "20.67",
+                    "valueMax": "64.8",
                     "propertyRealizedBy": "c02489f4-4374-41b8-97a5-ac588815aac8",
                     "property_constraint": []
                 },
@@ -87,8 +87,8 @@
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
-                    "valueMin": "0",
-                    "valueMax": "600",
+                    "valueMin": "188",
+                    "valueMax": "409",
                     "propertyRealizedBy": "5d28499a-55b3-4603-8b3a-08b5fac26edc",
                     "property_constraint": []
                 }
@@ -105,7 +105,7 @@
                 {
                     "capability_name": "HeatingRamp",
                     "capability_comment": "Increasing heat on the vessel by a defined slope",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#HeatingRamp"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#HeatingRamp"
                 }
             ],
             "properties": [
@@ -115,8 +115,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/Temperature",
                     "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
                     "valueType": "xs:double",
-                    "valueMin": "0",
-                    "valueMax": "100",
+                    "valueMin": "32.37",
+                    "valueMax": "70.91",
                     "propertyRealizedBy": "c02489f4-4374-41b8-97a5-ac588815aac8",
                     "property_constraint": []
                 },
@@ -137,8 +137,8 @@
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
-                    "valueMin": "0",
-                    "valueMax": "600",
+                    "valueMin": "267",
+                    "valueMax": "394",
                     "propertyRealizedBy": "5d28499a-55b3-4603-8b3a-08b5fac26edc",
                     "property_constraint": []
                 }
@@ -155,7 +155,7 @@
                 {
                     "capability_name": "StirringContinuous",
                     "capability_comment": "Stirring continuous",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringContinuous"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringContinuous"
                 }
             ],
             "properties": [
@@ -165,8 +165,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "100",
-                    "value1": "150",
+                    "value0": "118",
+                    "value1": "127",
                     "property_realized_by": ""
                 }
             ],
@@ -183,7 +183,7 @@
                 {
                     "capability_name": "StirringDuration",
                     "capability_comment": "Stirring of a certain duration",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringDuration"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringDuration"
                 }
             ],
             "properties": [
@@ -204,7 +204,7 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "100",
+                    "value0": "105",
                     "value1": "150",
                     "property_realized_by": ""
                 }
@@ -222,13 +222,13 @@
                 {
                     "capability_name": "StirringPulseContinuous",
                     "capability_comment": "Stirring in pusle mode continuously",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringPulseContinuous"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringPulseContinuous"
                 }
             ],
             "properties": [
                 {
                     "property_name": "PulseTimeHigh",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -239,7 +239,7 @@
                 },
                 {
                     "property_name": "PulseTimeLow",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -254,8 +254,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "100",
-                    "value1": "150",
+                    "value0": "102",
+                    "value1": "149",
                     "property_realized_by": ""
                 }
             ],
@@ -272,7 +272,7 @@
                 {
                     "capability_name": "StirringPulseDuration",
                     "capability_comment": "Stirring in pusle mode for a certain duration",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringPulseDuration"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringPulseDuration"
                 }
             ],
             "properties": [
@@ -289,7 +289,7 @@
                 },
                 {
                     "property_name": "PulseTimeHigh",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -300,7 +300,7 @@
                 },
                 {
                     "property_name": "PulseTimeLow",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -315,7 +315,7 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "100",
+                    "value0": "120",
                     "value1": "150",
                     "property_realized_by": ""
                 }
@@ -333,7 +333,7 @@
                 {
                     "capability_name": "Dosing",
                     "capability_comment": "Dosing of liquid from vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Dosing"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Dosing"
                 }
             ],
             "properties": [
@@ -355,8 +355,8 @@
                     "property_unit": "http://si-digital-framework.org/SI/units/litre",
                     "valueType": "xs:double",
                     "valueMin": "0.0",
-                    "valueMax": "15.0",
-                    "propertyRealizedBy": "",
+                    "valueMax": "14.5",
+                    "propertyRealizedBy": null,
                     "property_constraint": [
                         {
                             "conditional_type": "Pre",
@@ -378,7 +378,7 @@
                 {
                     "capability_name": "Stirring",
                     "capability_comment": "Stirring of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Stirring"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Stirring"
                 }
             ],
             "properties": [],
@@ -390,19 +390,19 @@
                 {
                     "capability_name": "Storing",
                     "capability_comment": "Storring of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Storing"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Storing"
                 }
             ],
             "properties": [
                 {
                     "property_name": "Volume",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://qudt.org/vocab/quantitykind/LiquidVolume",
                     "property_unit": "http://si-digital-framework.org/SI/units/litre",
                     "valueType": "xs:double",
                     "valueMin": "0.0",
-                    "valueMax": "15.0",
-                    "propertyRealizedBy": "",
+                    "valueMax": "13.06",
+                    "propertyRealizedBy": null,
                     "property_constraint": []
                 }
             ],
@@ -414,7 +414,7 @@
                 {
                     "capability_name": "MixingOfLiquids",
                     "capability_comment": "Mixing of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#MixingOfLiquids"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#MixingOfLiquids"
                 }
             ],
             "properties": [],
@@ -426,7 +426,7 @@
                 {
                     "capability_name": "HeatingOfLiquids",
                     "capability_comment": "Heating of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#HeatingOfLiquids"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#HeatingOfLiquids"
                 }
             ],
             "properties": [],
@@ -434,13 +434,13 @@
             "realized_by": []
         }
     ],
-    "resource: HC20": [
+    "resource: 2025-04_HC29": [
         {
             "capability": [
                 {
                     "capability_name": "StirringContinuous",
                     "capability_comment": "Stirring continuous",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringContinuous"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringContinuous"
                 }
             ],
             "properties": [
@@ -450,8 +450,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "200",
-                    "value1": "300",
+                    "value0": "204",
+                    "value1": "278",
                     "property_realized_by": ""
                 }
             ],
@@ -468,7 +468,7 @@
                 {
                     "capability_name": "StirringDuration",
                     "capability_comment": "Stirring of a certain duration",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringDuration"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringDuration"
                 }
             ],
             "properties": [
@@ -489,8 +489,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "200",
-                    "value1": "300",
+                    "value0": "217",
+                    "value1": "267",
                     "property_realized_by": ""
                 }
             ],
@@ -507,13 +507,13 @@
                 {
                     "capability_name": "StirringPulseContinuous",
                     "capability_comment": "Stirring in pusle mode continuously",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringPulseContinuous"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringPulseContinuous"
                 }
             ],
             "properties": [
                 {
                     "property_name": "PulseTimeHigh",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -524,7 +524,7 @@
                 },
                 {
                     "property_name": "PulseTimeLow",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -540,7 +540,7 @@
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
                     "value0": "200",
-                    "value1": "300",
+                    "value1": "290",
                     "property_realized_by": ""
                 }
             ],
@@ -557,7 +557,7 @@
                 {
                     "capability_name": "StirringPulseDuration",
                     "capability_comment": "Stirring in pusle mode for a certain duration",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringPulseDuration"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#StirringPulseDuration"
                 }
             ],
             "properties": [
@@ -574,7 +574,7 @@
                 },
                 {
                     "property_name": "PulseTimeHigh",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -585,7 +585,7 @@
                 },
                 {
                     "property_name": "PulseTimeLow",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://www.w3.org/2006/time#Duration",
                     "property_unit": "http://si-digital-framework.org/SI/units/second",
                     "valueType": "xs:int",
@@ -600,8 +600,8 @@
                     "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
                     "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
                     "valueType": "xs:int",
-                    "value0": "200",
-                    "value1": "300",
+                    "value0": "243",
+                    "value1": "294",
                     "property_realized_by": ""
                 }
             ],
@@ -618,7 +618,7 @@
                 {
                     "capability_name": "Dosing",
                     "capability_comment": "Dosing of liquid from vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Dosing"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Dosing"
                 }
             ],
             "properties": [
@@ -640,8 +640,8 @@
                     "property_unit": "http://si-digital-framework.org/SI/units/litre",
                     "valueType": "xs:double",
                     "valueMin": "0.0",
-                    "valueMax": "15.0",
-                    "propertyRealizedBy": "",
+                    "valueMax": "14.3",
+                    "propertyRealizedBy": null,
                     "property_constraint": [
                         {
                             "conditional_type": "Pre",
@@ -663,7 +663,7 @@
                 {
                     "capability_name": "Stirring",
                     "capability_comment": "Stirring of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Stirring"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Stirring"
                 }
             ],
             "properties": [],
@@ -675,19 +675,19 @@
                 {
                     "capability_name": "Storing",
                     "capability_comment": "Storring of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Storing"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#Storing"
                 }
             ],
             "properties": [
                 {
                     "property_name": "Volume",
-                    "property_comment": "",
+                    "property_comment": null,
                     "property_ID": "http://qudt.org/vocab/quantitykind/LiquidVolume",
                     "property_unit": "http://si-digital-framework.org/SI/units/litre",
                     "valueType": "xs:double",
                     "valueMin": "0.0",
-                    "valueMax": "15.0",
-                    "propertyRealizedBy": "",
+                    "valueMax": "12.37",
+                    "propertyRealizedBy": null,
                     "property_constraint": []
                 }
             ],
@@ -699,124 +699,7 @@
                 {
                     "capability_name": "MixingOfLiquids",
                     "capability_comment": "Mixing of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#MixingOfLiquids"
-                }
-            ],
-            "properties": [],
-            "generalized_by": [],
-            "realized_by": []
-        }
-    ],
-    "resource: HC30": [
-        {
-            "capability": [
-                {
-                    "capability_name": "StirringContinuous",
-                    "capability_comment": "Stirring continuous",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringContinuous"
-                }
-            ],
-            "properties": [
-                {
-                    "property_name": "RevolutionsPerMinute",
-                    "property_comment": "",
-                    "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
-                    "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
-                    "valueType": "xs:int",
-                    "value0": "200",
-                    "value1": "300",
-                    "property_realized_by": ""
-                }
-            ],
-            "generalized_by": [
-                "MixingOfLiquids",
-                "Stirring"
-            ],
-            "realized_by": [
-                "da03d3d0-713e-470b-bb1c-aa65fabc93f9"
-            ]
-        },
-        {
-            "capability": [
-                {
-                    "capability_name": "StirringDuration",
-                    "capability_comment": "Stirring of a certain duration",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#StirringDuration"
-                }
-            ],
-            "properties": [
-                {
-                    "property_name": "StirringTime",
-                    "property_comment": "Duration for stirring in seconds",
-                    "property_ID": "http://www.w3.org/2006/time#Duration",
-                    "property_unit": "http://si-digital-framework.org/SI/units/second",
-                    "valueType": "xs:int",
-                    "valueMin": "0",
-                    "valueMax": null,
-                    "propertyRealizedBy": "39c48383-fa88-4ffe-9c82-b40d69462cf9",
-                    "property_constraint": []
-                },
-                {
-                    "property_name": "RevolutionsPerMinute",
-                    "property_comment": "",
-                    "property_ID": "http://qudt.org/vocab/quantitykind/RotationalVelocity",
-                    "property_unit": "http://qudt.org/vocab/unit/REV-PER-MIN",
-                    "valueType": "xs:int",
-                    "value0": "200",
-                    "value1": "300",
-                    "property_realized_by": ""
-                }
-            ],
-            "generalized_by": [
-                "MixingOfLiquids",
-                "Stirring"
-            ],
-            "realized_by": [
-                "d0992f3e-6c5b-4b85-867a-b669c5fa452b"
-            ]
-        },
-        {
-            "capability": [
-                {
-                    "capability_name": "Stirring",
-                    "capability_comment": "Stirring of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Stirring"
-                }
-            ],
-            "properties": [],
-            "generalized_by": [],
-            "realized_by": []
-        },
-        {
-            "capability": [
-                {
-                    "capability_name": "Storing",
-                    "capability_comment": "Storring of liquid in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#Storing"
-                }
-            ],
-            "properties": [
-                {
-                    "property_name": "Volume",
-                    "property_comment": "",
-                    "property_ID": "http://qudt.org/vocab/quantitykind/LiquidVolume",
-                    "property_unit": "http://si-digital-framework.org/SI/units/litre",
-                    "valueType": "xs:double",
-                    "valueMin": "0.0",
-                    "valueMax": "15.0",
-                    "propertyRealizedBy": "",
-                    "property_constraint": []
-                }
-            ],
-            "generalized_by": [],
-            "realized_by": []
-        },
-        {
-            "capability": [
-                {
-                    "capability_name": "MixingOfLiquids",
-                    "capability_comment": "Mixing of liquids in the vessel",
-                    "capability_ID": "http://www.iat.rwth-aachen.de/capability-ontology#MixingOfLiquids"
+                    "capability_ID": "http://css.iat.rwth-aachen.de/OntoProCap#MixingOfLiquids"
                 }
             ],
             "properties": [],

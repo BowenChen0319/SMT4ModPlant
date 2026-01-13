@@ -69,7 +69,7 @@
                     "Key": "http://www.w3.org/2006/time#Duration"
                 }
             ],
-            "SemanticDescription": "http://www.iat.rwth-aachen.de/capability-ontology#MixingOfLiquids"
+            "SemanticDescription": "http://css.iat.rwth-aachen.de/OntoProCap#MixingOfLiquids"
         },
         {
             "ID": "Dosing001",
@@ -84,7 +84,7 @@
                     "Key": "http://qudt.org/vocab/quantitykind/LiquidVolume"
                 }
             ],
-            "SemanticDescription": "http://www.iat.rwth-aachen.de/capability-ontology#Dosing"
+            "SemanticDescription": "http://css.iat.rwth-aachen.de/OntoProCap#Dosing"
         },
         {
             "ID": "Heating_of_liquids001",
@@ -107,7 +107,7 @@
                     "Key": "http://www.w3.org/2006/time#Duration"
                 }
             ],
-            "SemanticDescription": "http://www.iat.rwth-aachen.de/capability-ontology#HeatingOfLiquids"
+            "SemanticDescription": "http://css.iat.rwth-aachen.de/OntoProCap#HeatingOfLiquids"
         }
     ],
     "DirectedLinks": [

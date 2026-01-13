@@ -1,3 +1,4 @@
+
 # gui.py
 # -*- coding: utf-8 -*-
 import sys
@@ -28,7 +29,7 @@ from PyQt6.QtGui import QColor, QTextCursor, QBrush
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QProgressBar, QTableWidgetItem, QHeaderView,
-    QFileDialog
+    QFileDialog, QSlider
 )
 
 from qfluentwidgets import (
@@ -109,7 +110,8 @@ class SMTWorker(QThread):
             find_all = (self.mode_index >= 1) # Pro or Ultra
             is_ultra = (self.mode_index == 2)
             
-            self.log_signal.emit(f"Starting SMT Logic (Mode: {['Fast', 'Pro', 'Ultra'][self.mode_index]})...")
+            mode_names = ['Fast', 'Pro', 'Ultra']
+            self.log_signal.emit(f"Starting SMT Logic (Mode: {mode_names[self.mode_index]})...")
             
             # SMT run
             gui_results, json_solutions = run_optimization(
@@ -135,26 +137,18 @@ class SMTWorker(QThread):
                 # Optimize from memory
                 evaluated_solutions = optimizer.optimize_solutions_from_memory(json_solutions)
                 
-                # Create a map for easy lookup: solution_id -> evaluation_result
-                score_map = {sol['solution_id']: sol for sol in evaluated_solutions}
-                
                 # Merge scores into gui_results
-                # gui_results contains rows for each step. We need to inject score info into each row.
-                # Also we need to reorder gui_results based on the sorted order in evaluated_solutions.
-                
                 sorted_gui_results = []
                 
-                # evaluated_solutions is already sorted by score (best first)
+                # evaluated_solutions is sorted by score (best first)
                 for eval_sol in evaluated_solutions:
                     sol_id = eval_sol['solution_id']
                     
                     # Find all rows in gui_results matching this sol_id
                     rows = [r for r in gui_results if r.get('solution_id') == sol_id]
                     
-                    # Add separator if not first
                     if sorted_gui_results: sorted_gui_results.append({})
                     
-                    # Inject score data into rows and append
                     for row in rows:
                         row['composite_score'] = eval_sol['composite_score']
                         row['energy_cost'] = eval_sol['total_energy_cost']
@@ -163,7 +157,8 @@ class SMTWorker(QThread):
                         sorted_gui_results.append(row)
                 
                 gui_results = sorted_gui_results
-                self.log_signal.emit(f"Optimization complete. Best Solution ID: {evaluated_solutions[0]['solution_id']}")
+                if evaluated_solutions:
+                    self.log_signal.emit(f"Optimization complete. Best Solution ID: {evaluated_solutions[0]['solution_id']}")
 
             self.progress_signal.emit(100, 100)
             self.finished_signal.emit(gui_results)
@@ -197,7 +192,7 @@ class ResultsPage(QWidget):
         super().__init__(parent)
         self.setObjectName("results_page")
         layout = QVBoxLayout(self)
-        self.title = SubtitleLabel("Matching Results", self)
+        self.title = SubtitleLabel("Calculation Results", self)
         
         self.table = TableWidget(self)
         self.table.verticalHeader().setVisible(False)
@@ -211,11 +206,36 @@ class ResultsPage(QWidget):
         # Determine if we have score data (Ultra mode)
         has_score = False
         if data and len(data) > 0:
-            # Check first non-empty row
             for row in data:
-                if row:
-                    if 'composite_score' in row: has_score = True
+                if row: 
+                    if 'composite_score' in row: 
+                        has_score = True
                     break
+        
+        # Filter logic: Remove solutions with Score 0 if in Ultra mode
+        if has_score:
+            filtered_data = []
+            temp_block = []
+            
+            for row in data:
+                if not row: # Separator found
+                    if temp_block:
+                        score = temp_block[0].get('composite_score', 0)
+                        if score > 0:
+                            if filtered_data: filtered_data.append({}) 
+                            filtered_data.extend(temp_block)
+                        temp_block = []
+                else:
+                    temp_block.append(row)
+            
+            if temp_block:
+                score = temp_block[0].get('composite_score', 0)
+                if score > 0:
+                    if filtered_data: filtered_data.append({})
+                    filtered_data.extend(temp_block)
+            
+            data = filtered_data
+            
         
         # Configure Columns
         if has_score:
@@ -228,14 +248,12 @@ class ResultsPage(QWidget):
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         
-        # Stretch capabilities column
         cap_col_idx = 5 if has_score else 4
         self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.Stretch)
 
         self.table.setRowCount(len(data))
         
         for r, row_data in enumerate(data):
-            # Separator
             if not row_data:
                 for c in range(self.table.columnCount()):
                     item = QTableWidgetItem("")
@@ -243,9 +261,7 @@ class ResultsPage(QWidget):
                     self.table.setItem(r, c, item)
                 continue
 
-            # Fill Data
             if has_score:
-                # ["Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
                 self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
                 self.table.setItem(r, 1, QTableWidgetItem(f"{row_data.get('composite_score', 0):.2f}"))
                 self.table.setItem(r, 2, QTableWidgetItem(str(row_data['step_id'])))
@@ -256,7 +272,6 @@ class ResultsPage(QWidget):
                 self.table.setItem(r, 7, QTableWidgetItem(f"{row_data.get('use_cost', 0):.1f}"))
                 self.table.setItem(r, 8, QTableWidgetItem(f"{row_data.get('co2_footprint', 0):.1f}"))
             else:
-                # ["Sol ID", "Step", "Description", "Resource", "Capabilities", "Status"]
                 self.table.setItem(r, 0, QTableWidgetItem(str(row_data.get('solution_id', ''))))
                 self.table.setItem(r, 1, QTableWidgetItem(str(row_data['step_id'])))
                 self.table.setItem(r, 2, QTableWidgetItem(str(row_data['description'])))
@@ -273,7 +288,7 @@ class HomePage(QWidget):
         super().__init__(parent)
         self.setObjectName("home_page")
         self.log_callback = log_callback
-        self.settings_page = settings_page # Reference to settings to get weights
+        self.settings_page = settings_page
         self.recipe_path = ""
         self.resource_dir = ""
         
@@ -320,7 +335,7 @@ class HomePage(QWidget):
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
-        # --- [MODIFIED] Mode Slider ---
+        # Mode Slider
         self.card_opts = CardWidget(self)
         l_opts = QHBoxLayout(self.card_opts)
         icon_opts = IconWidget(FluentIcon.SPEED_HIGH, self)
@@ -331,33 +346,111 @@ class HomePage(QWidget):
         v_opts.addWidget(self.lbl_opts)
         v_opts.addWidget(self.lbl_opts_desc)
         
-        # Slider Logic
         self.slider_mode = Slider(Qt.Orientation.Horizontal, self)
         self.slider_mode.setRange(0, 2)
-        self.slider_mode.setValue(1) # Default Pro
+        self.slider_mode.setPageStep(1)
+        self.slider_mode.setSingleStep(1)
+        self.slider_mode.setValue(0) # Default: Fast
+        
         self.slider_mode.setFixedWidth(200)
-        # Update label on change
-        self.slider_mode.valueChanged.connect(self.update_mode_label)
+        self.slider_mode.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.slider_mode.setTickInterval(1)
+        self.slider_mode.valueChanged.connect(self.update_ui_state)
         
         l_opts.addWidget(icon_opts)
         l_opts.addLayout(v_opts, 1)
         l_opts.addWidget(self.slider_mode)
         layout.addWidget(self.card_opts)
-        # ---------------------------------
 
-        self.btn_run = PrimaryPushButton("Start Calculation", self)
+        # Big Button
+        self.btn_run = PrimaryPushButton("Start Calculation in Fast Mode", self)
         self.btn_run.setEnabled(False)
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
 
+        # Progress Bar
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
         layout.addWidget(self.pbar)
+        
         layout.addStretch()
+        
+        # Initialize UI state (Default: Fast/Green)
+        self.update_ui_state(0)
 
-    def update_mode_label(self, val):
-        modes = ["Fast (Single)", "Pro (All Valid)", "Ultra (Optimized)"]
-        self.lbl_opts_desc.setText(modes[val])
+    def update_ui_state(self, val):
+        """Update colors, text, and visibility based on slider value immediately"""
+        modes = ["Fast", "Pro", "Ultra"]
+        mode_text = modes[val]
+        
+        # 1. Update Settings Visibility
+        # Show weights ONLY if Ultra (2)
+        if self.settings_page:
+            self.settings_page.set_weights_visible(val == 2)
+
+        # 2. Define colors (Green, Blue, Orange)
+        if val == 0: # Fast - Green
+            color_hex = "#107C10" 
+            desc = "Fast (Single Solution)"
+        elif val == 1: # Pro - Blue (IAT style)
+            color_hex = "#00629B"
+            desc = "Pro (All Valid Solutions)"
+        else: # Ultra - Orange
+            color_hex = "#FF8C00" 
+            desc = "Ultra (Cost Optimization)"
+
+        self.lbl_opts_desc.setText(desc)
+        self.btn_run.setText(f"Start Calculation in {mode_text} Mode")
+        
+        # 3. Apply Styling
+        btn_style = f"""
+            PrimaryPushButton {{
+                background-color: {color_hex};
+                border: 1px solid {color_hex};
+                border-radius: 6px;
+                color: white;
+                height: 40px;
+                font-size: 16px;
+                font-weight: bold;
+                font-family: 'Segoe UI', sans-serif;
+            }}
+            PrimaryPushButton:hover {{
+                background-color: {color_hex};
+                border: 1px solid {color_hex};
+            }}
+            PrimaryPushButton:pressed {{
+                background-color: {color_hex};
+                opacity: 0.8;
+            }}
+            PrimaryPushButton:disabled {{
+                background-color: {color_hex};
+                opacity: 0.5;
+                border: 1px solid {color_hex};
+                color: rgba(255, 255, 255, 0.8);
+            }}
+        """
+        self.btn_run.setStyleSheet(btn_style)
+        
+        slider_style = f"""
+            Slider::groove:horizontal {{
+                height: 4px; 
+                background: #cccccc;
+                border-radius: 2px;
+            }}
+            Slider::handle:horizontal {{
+                background: {color_hex};
+                border: 2px solid {color_hex};
+                width: 18px;
+                height: 18px;
+                border-radius: 10px;
+                margin: -7px 0;
+            }}
+            Slider::sub-page:horizontal {{
+                background: {color_hex};
+                border-radius: 2px;
+            }}
+        """
+        self.slider_mode.setStyleSheet(slider_style)
 
     def select_recipe(self):
         f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
@@ -382,7 +475,6 @@ class HomePage(QWidget):
         self.log_callback("Starting Process...")
         
         mode = self.slider_mode.value()
-        # Get weights from settings page
         weights = self.settings_page.get_weights()
         
         self.worker = SMTWorker(self.recipe_path, self.resource_dir, mode, weights)
@@ -428,15 +520,14 @@ class SettingsPage(QWidget):
         l_theme.addWidget(self.switch_theme)
         layout.addWidget(self.card_theme)
         
-        # --- [NEW] Optimization Weights ---
+        # Weights (Initially Hidden)
         self.card_weights = CardWidget(self)
         l_weights = QVBoxLayout(self.card_weights)
         l_weights.setContentsMargins(20, 20, 20, 20)
         
-        w_title = SubtitleLabel("Optimization Weights", self)
+        w_title = SubtitleLabel("Optimization Weights (Sum = 1.0)", self)
         l_weights.addWidget(w_title)
         
-        # Helper to create weight row
         def create_weight_row(label, default_val):
             row = QHBoxLayout()
             lbl = BodyLabel(label, self)
@@ -457,9 +548,55 @@ class SettingsPage(QWidget):
         l_weights.addLayout(r2)
         l_weights.addLayout(r3)
         layout.addWidget(self.card_weights)
-        # ---------------------------------
+        
+        # Default state: Hidden
+        self.card_weights.setVisible(False)
+        
+        # Connect signals for auto-balancing
+        self.spin_energy.valueChanged.connect(lambda v: self.balance_weights(self.spin_energy, v))
+        self.spin_use.valueChanged.connect(lambda v: self.balance_weights(self.spin_use, v))
+        self.spin_co2.valueChanged.connect(lambda v: self.balance_weights(self.spin_co2, v))
+        
+        # Store previous values to calculate delta
+        self.prev_vals = {
+            self.spin_energy: 0.4,
+            self.spin_use: 0.3,
+            self.spin_co2: 0.3
+        }
         
         layout.addStretch()
+
+    def set_weights_visible(self, visible: bool):
+        """Called by HomePage slider to toggle visibility"""
+        self.card_weights.setVisible(visible)
+
+    def balance_weights(self, source_spin, new_val):
+        """Ensure sum remains 1.0 by adjusting other two weights"""
+        old_val = self.prev_vals[source_spin]
+        delta = new_val - old_val
+        
+        # Update stored value
+        self.prev_vals[source_spin] = new_val
+        
+        if abs(delta) < 0.0001: return
+        
+        # Identify other spinners
+        others = [s for s in [self.spin_energy, self.spin_use, self.spin_co2] if s != source_spin]
+        
+        # Distribute -delta equally among others (half each)
+        # Block signals to prevent recursion
+        for s in others: s.blockSignals(True)
+        
+        # Adjustment per spinner
+        adjustment = delta / 2.0
+        
+        # Apply
+        for s in others:
+            curr = s.value()
+            s.setValue(max(0.0, min(1.0, curr - adjustment)))
+            self.prev_vals[s] = s.value() # Update their stored state too
+            
+        for s in others: s.blockSignals(False)
 
     def toggle_theme(self, checked):
         if checked: setTheme(Theme.DARK)
@@ -477,14 +614,13 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
         setTheme(Theme.DARK)
-        self.resize(1100, 750) # Widen slightly for extra columns
+        self.resize(1100, 750)
         
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             self.move(geo.width()//2 - self.width()//2, geo.height()//2 - self.height()//2)
         
-        # Init Pages (Create settings first to pass to home)
         self.settings_page = SettingsPage(self)
         self.log_page = LogPage(self)
         self.results_page = ResultsPage(self)
