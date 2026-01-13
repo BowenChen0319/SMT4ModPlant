@@ -78,10 +78,11 @@ class SMTWorker(QThread):
     finished_signal = pyqtSignal(list)
     error_signal = pyqtSignal(str)
 
-    def __init__(self, recipe_path, resource_dir):
+    def __init__(self, recipe_path, resource_dir, find_all_solutions):
         super().__init__()
         self.recipe_path = recipe_path
         self.resource_dir = resource_dir
+        self.find_all_solutions = find_all_solutions
 
     def run(self):
         try:
@@ -129,8 +130,14 @@ class SMTWorker(QThread):
 
             self.log_signal.emit("Starting SMT Optimization (Z3)...")
             
-            # Call with generate_json=True to save all solutions
-            results = run_optimization(recipe_data, all_capabilities, log_callback=self.log_signal.emit, generate_json=True)
+            # Pass the switch value to the backend
+            results = run_optimization(
+                recipe_data, 
+                all_capabilities, 
+                log_callback=self.log_signal.emit, 
+                generate_json=True,
+                find_all_solutions=self.find_all_solutions
+            )
             
             self.progress_signal.emit(100, 100)
             self.finished_signal.emit(results)
@@ -164,15 +171,18 @@ class ResultsPage(QWidget):
         super().__init__(parent)
         self.setObjectName("results_page")
         layout = QVBoxLayout(self)
-        self.title = SubtitleLabel("Matching Results (All Solutions)", self)
+        self.title = SubtitleLabel("Matching Results", self)
         
         self.table = TableWidget(self)
         # Increased column count to 6 to include Solution ID
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Sol ID", "Step ID", "Description", "Assigned Resource", "Capabilities", "Status"])
+        self.table.setHorizontalHeaderLabels(["Sol ID", "Step ID", "Description", "Assigned Resource", "Capabilities (Params)", "Status"])
         self.table.verticalHeader().setVisible(False)
         self.table.setBorderVisible(True)
-        self.table.setWordWrap(False)
+        
+        # [NEW] Enable word wrap and auto row height for multiline capability details
+        self.table.setWordWrap(True)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch) # Capabilities column stretch
@@ -189,8 +199,6 @@ class ResultsPage(QWidget):
                 # Fill the row with empty, disabled items to create a visual break
                 for c in range(6):
                     item = QTableWidgetItem("")
-                    # Set background color slightly different to indicate separator (optional, works better in light mode)
-                    # item.setBackground(QBrush(QColor(50, 50, 50))) 
                     item.setFlags(Qt.ItemFlag.NoItemFlags) # Disable selection
                     self.table.setItem(r, c, item)
                 continue
@@ -204,13 +212,16 @@ class ResultsPage(QWidget):
             self.table.setItem(r, 2, QTableWidgetItem(str(row_data['description'])))
             # Col 3: Resource
             self.table.setItem(r, 3, QTableWidgetItem(str(row_data['resource'])))
-            # Col 4: Capabilities
+            # Col 4: Capabilities (Now multiline with params)
             self.table.setItem(r, 4, QTableWidgetItem(str(row_data['capabilities'])))
             
             # Col 5: Status (Green)
             status_item = QTableWidgetItem(str(row_data['status']))
             status_item.setForeground(QColor("#28a745")) 
             self.table.setItem(r, 5, status_item)
+        
+        # Ensure rows adjust to content height
+        self.table.resizeRowsToContents()
 
 class HomePage(QWidget):
     def __init__(self, log_callback, parent=None):
@@ -237,10 +248,7 @@ class HomePage(QWidget):
         # Card 1: Recipe
         self.card_recipe = CardWidget(self)
         l1 = QHBoxLayout(self.card_recipe)
-        
-        # Using standard DOCUMENT icon
         icon1 = IconWidget(FluentIcon.DOCUMENT, self)
-        
         v1 = QVBoxLayout()
         self.lbl_recipe = BodyLabel("General Recipe XML", self)
         self.lbl_recipe_val = CaptionLabel("No file selected", self)
@@ -256,13 +264,8 @@ class HomePage(QWidget):
         # Card 2: Resources
         self.card_res = CardWidget(self)
         l2 = QHBoxLayout(self.card_res)
-        
-        # Using standard FOLDER icon
         icon2 = IconWidget(FluentIcon.FOLDER, self)
-        
         v2 = QVBoxLayout()
-        
-        # Label updated to indicate support for both XML and AASX
         self.lbl_res = BodyLabel("Resources Directory (XML/AASX)", self)
         self.lbl_res_val = CaptionLabel("No folder selected", self)
         v2.addWidget(self.lbl_res)
@@ -273,6 +276,28 @@ class HomePage(QWidget):
         l2.addLayout(v2, 1)
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
+
+        # --- [NEW] Solver Options Card ---
+        self.card_opts = CardWidget(self)
+        l_opts = QHBoxLayout(self.card_opts)
+        icon_opts = IconWidget(FluentIcon.SEARCH, self)
+        
+        # Switch for "Find All Solutions"
+        self.lbl_opts = BodyLabel("Find All Valid Solutions", self)
+        self.lbl_opts_desc = CaptionLabel("If off, stops after finding the first valid match.", self)
+        v_opts = QVBoxLayout()
+        v_opts.addWidget(self.lbl_opts)
+        v_opts.addWidget(self.lbl_opts_desc)
+        
+        self.switch_all_sol = SwitchButton(self)
+        self.switch_all_sol.setChecked(True) # Default: Find All
+        
+        l_opts.addWidget(icon_opts)
+        l_opts.addLayout(v_opts, 1)
+        l_opts.addWidget(self.switch_all_sol)
+        
+        layout.addWidget(self.card_opts)
+        # ---------------------------------
 
         # Actions
         self.btn_run = PrimaryPushButton("Start Calculation", self)
@@ -308,7 +333,11 @@ class HomePage(QWidget):
     def run_process(self):
         self.btn_run.setEnabled(False)
         self.log_callback("Starting Process...")
-        self.worker = SMTWorker(self.recipe_path, self.resource_dir)
+        
+        # [NEW] Pass the switch state to the worker
+        find_all = self.switch_all_sol.isChecked()
+        
+        self.worker = SMTWorker(self.recipe_path, self.resource_dir, find_all)
         self.worker.log_signal.connect(self.log_callback)
         self.worker.progress_signal.connect(lambda c, t: (self.pbar.setMaximum(t), self.pbar.setValue(c)))
         self.worker.error_signal.connect(lambda e: InfoBar.error(title="Error", content=e, parent=self.window()))
@@ -321,7 +350,7 @@ class HomePage(QWidget):
         if isinstance(main, MainWindow):
             main.results_page.update_table(results)
             main.switchTo(main.results_page)
-            InfoBar.success(title="Completed", content=f"Calculation finished. Found valid solutions.", parent=main, position=InfoBarPosition.TOP_RIGHT)
+            InfoBar.success(title="Completed", content=f"Calculation finished.", parent=main, position=InfoBarPosition.TOP_RIGHT)
 
 # ---------------------------------------------------------
 # SETTINGS PAGE

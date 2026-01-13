@@ -314,15 +314,58 @@ def solution_to_json(model, process_steps, resources, step_resource_to_caps_prop
     
     return solution_data
 
+def format_capability_string(cap_prop_pairs):
+    """
+    Format capabilities with their parameters for display.
+    Input: List of tuples (cap_name, matched_props)
+    Output: Formatted string like "Mixing (Speed: 200 -> [0-500])"
+    """
+    display_parts = []
+    
+    for cap_name, matched_props in cap_prop_pairs:
+        param_strs = []
+        for param, prop in matched_props:
+            # Recipe requirement value
+            req_val = param.get('ValueString', '?')
+            # Parameter name (short)
+            param_desc = param.get('Description', 'Param').split(' ')[0] 
+            
+            # Resource provided value (Range or Discrete)
+            res_val = "?"
+            
+            # Try range
+            v_min = prop.get('valueMin')
+            v_max = prop.get('valueMax')
+            
+            # Try discrete
+            discrete_vals = []
+            for k, v in prop.items():
+                if k.startswith('value') and k not in ['valueType', 'valueMin', 'valueMax'] and v is not None:
+                    discrete_vals.append(str(v))
+            
+            if v_min is not None or v_max is not None:
+                res_val = f"[{v_min or '-inf'} - {v_max or 'inf'}]"
+            elif discrete_vals:
+                res_val = f"{{{','.join(discrete_vals)}}}"
+                
+            param_strs.append(f"{param_desc}: {req_val} -> {res_val}")
+        
+        if param_strs:
+            display_parts.append(f"{cap_name} ({', '.join(param_strs)})")
+        else:
+            display_parts.append(cap_name)
+            
+    return "\n".join(display_parts)
+
 # ---------------------------------------------------------
 # EXPORTED FUNCTION (Only this is called by GUI)
 # ---------------------------------------------------------
 
-def run_optimization(recipe_data, capabilities_data, log_callback=print, generate_json=False):
+def run_optimization(recipe_data, capabilities_data, log_callback=print, generate_json=False, find_all_solutions=True):
     process_steps = recipe_data['ProcessElements']
     resources = list(capabilities_data.keys())
     
-    log_callback(f"Starting optimization for {len(process_steps)} steps with {len(resources)} resources...")
+    log_callback(f"Starting optimization (Find All: {find_all_solutions})...")
 
     step_resource_to_caps_props = [[[] for _ in resources] for _ in process_steps]
     Assignment = []
@@ -433,15 +476,26 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
                 for j, res in enumerate(resources):
                     var = Assignment[i][j]
                     if var is not None and is_true(model[var]):
-                        caps, _ = step_resource_to_caps_props[i][j]
+                        # Get detailed matches: (cap_name, matched_props_list)
+                        caps, cap_prop_pairs = step_resource_to_caps_props[i][j]
+                        
+                        # Generate formatted string with parameters
+                        formatted_cap_str = format_capability_string(cap_prop_pairs)
+                        
                         all_results_for_gui.append({
-                            "solution_id": valid_solution_count,  # New field for sorting/display
+                            "solution_id": valid_solution_count,
                             "step_id": step['ID'],
                             "description": step['Description'],
                             "resource": res,
-                            "capabilities": ", ".join(caps),
+                            "capabilities": formatted_cap_str, # Now includes parameter details
                             "status": "Matched"
                         })
+            
+            # Check if we should stop after first solution
+            if not find_all_solutions:
+                log_callback("Stopping after first solution as requested.")
+                break
+
         else:
             log_callback(f"Attempt {attempt_count}: Model SAT, but Material Flow inconsistent. Retrying...")
         

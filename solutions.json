@@ -133,11 +133,9 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: HC10",
+          "resource": "resource: 2025-04_HC12",
           "capabilities": [
-            "HeatingControlled",
-            "HeatingPWM",
-            "HeatingRamp"
+            "HeatingPWM"
           ],
           "parameter_matches": [
             {
@@ -155,35 +153,14 @@
           ],
           "capability_details": [
             {
-              "capability_name": "HeatingControlled",
-              "matched_properties": [
-                {
-                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
-                  "property_name": "SetTemperature",
-                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "0",
-                  "value_max": "100",
-                  "value_type": "range"
-                },
-                {
-                  "property_id": "http://www.w3.org/2006/time#Duration",
-                  "property_name": "HoldingTime",
-                  "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "0",
-                  "value_max": "600",
-                  "value_type": "range"
-                }
-              ]
-            },
-            {
               "capability_name": "HeatingPWM",
               "matched_properties": [
                 {
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "0",
-                  "value_max": "100",
+                  "value_min": "24.81",
+                  "value_max": "65.67",
                   "value_type": "range"
                 },
                 {
@@ -191,28 +168,7 @@
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
                   "value_min": "0",
-                  "value_max": "600",
-                  "value_type": "range"
-                }
-              ]
-            },
-            {
-              "capability_name": "HeatingRamp",
-              "matched_properties": [
-                {
-                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
-                  "property_name": "SetTemperature",
-                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "0",
-                  "value_max": "100",
-                  "value_type": "range"
-                },
-                {
-                  "property_id": "http://www.w3.org/2006/time#Duration",
-                  "property_name": "HoldingTime",
-                  "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "0",
-                  "value_max": "600",
+                  "value_max": "483",
                   "value_type": "range"
                 }
               ]
@@ -531,10 +487,10 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: 2025-04_HC19",
+          "resource": "resource: 2025-04_HC18",
           "capabilities": [
             "HeatingControlled",
-            "HeatingPWM"
+            "HeatingRamp"
           ],
           "parameter_matches": [
             {
@@ -558,37 +514,37 @@
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "24.13",
-                  "value_max": "62.64",
+                  "value_min": "22.58",
+                  "value_max": "75.57",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "70",
-                  "value_max": "543",
+                  "value_min": "33",
+                  "value_max": "567",
                   "value_type": "range"
                 }
               ]
             },
             {
-              "capability_name": "HeatingPWM",
+              "capability_name": "HeatingRamp",
               "matched_properties": [
                 {
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "20.67",
-                  "value_max": "64.8",
+                  "value_min": "24.6",
+                  "value_max": "66.8",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "188",
-                  "value_max": "409",
+                  "value_min": "85",
+                  "value_max": "475",
                   "value_type": "range"
                 }
               ]
@@ -730,9 +686,10 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: 2025-04_HC18",
+          "resource": "resource: 2025-04_HC15",
           "capabilities": [
             "HeatingControlled",
+            "HeatingPWM",
             "HeatingRamp"
           ],
           "parameter_matches": [
@@ -757,16 +714,37 @@
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "22.58",
-                  "value_max": "75.57",
+                  "value_min": "25.75",
+                  "value_max": "65",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "33",
-                  "value_max": "567",
+                  "value_min": "0",
+                  "value_max": "453",
+                  "value_type": "range"
+                }
+              ]
+            },
+            {
+              "capability_name": "HeatingPWM",
+              "matched_properties": [
+                {
+                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
+                  "property_name": "SetTemperature",
+                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
+                  "value_min": "0",
+                  "value_max": "64",
+                  "value_type": "range"
+                },
+                {
+                  "property_id": "http://www.w3.org/2006/time#Duration",
+                  "property_name": "HoldingTime",
+                  "property_unit": "http://si-digital-framework.org/SI/units/second",
+                  "value_min": "0",
+                  "value_max": "600",
                   "value_type": "range"
                 }
               ]
@@ -778,16 +756,16 @@
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "24.6",
-                  "value_max": "66.8",
+                  "value_min": "0",
+                  "value_max": "100",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "85",
-                  "value_max": "475",
+                  "value_min": "0",
+                  "value_max": "600",
                   "value_type": "range"
                 }
               ]
@@ -929,7 +907,7 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: 2025-04_HC10",
+          "resource": "resource: HC10",
           "capabilities": [
             "HeatingControlled",
             "HeatingPWM",
@@ -1150,9 +1128,11 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: 2025-04_HC12",
+          "resource": "resource: 2025-04_HC10",
           "capabilities": [
-            "HeatingPWM"
+            "HeatingControlled",
+            "HeatingPWM",
+            "HeatingRamp"
           ],
           "parameter_matches": [
             {
@@ -1170,14 +1150,14 @@
           ],
           "capability_details": [
             {
-              "capability_name": "HeatingPWM",
+              "capability_name": "HeatingControlled",
               "matched_properties": [
                 {
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "24.81",
-                  "value_max": "65.67",
+                  "value_min": "0",
+                  "value_max": "100",
                   "value_type": "range"
                 },
                 {
@@ -1185,7 +1165,49 @@
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
                   "value_min": "0",
-                  "value_max": "483",
+                  "value_max": "600",
+                  "value_type": "range"
+                }
+              ]
+            },
+            {
+              "capability_name": "HeatingPWM",
+              "matched_properties": [
+                {
+                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
+                  "property_name": "SetTemperature",
+                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
+                  "value_min": "0",
+                  "value_max": "100",
+                  "value_type": "range"
+                },
+                {
+                  "property_id": "http://www.w3.org/2006/time#Duration",
+                  "property_name": "HoldingTime",
+                  "property_unit": "http://si-digital-framework.org/SI/units/second",
+                  "value_min": "0",
+                  "value_max": "600",
+                  "value_type": "range"
+                }
+              ]
+            },
+            {
+              "capability_name": "HeatingRamp",
+              "matched_properties": [
+                {
+                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
+                  "property_name": "SetTemperature",
+                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
+                  "value_min": "0",
+                  "value_max": "100",
+                  "value_type": "range"
+                },
+                {
+                  "property_id": "http://www.w3.org/2006/time#Duration",
+                  "property_name": "HoldingTime",
+                  "property_unit": "http://si-digital-framework.org/SI/units/second",
+                  "value_min": "0",
+                  "value_max": "600",
                   "value_type": "range"
                 }
               ]
@@ -1327,11 +1349,10 @@
         {
           "step_id": "Heating_of_liquids001",
           "step_description": "Heating_of_liquids",
-          "resource": "resource: 2025-04_HC15",
+          "resource": "resource: 2025-04_HC19",
           "capabilities": [
             "HeatingControlled",
-            "HeatingPWM",
-            "HeatingRamp"
+            "HeatingPWM"
           ],
           "parameter_matches": [
             {
@@ -1355,16 +1376,16 @@
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "25.75",
-                  "value_max": "65",
+                  "value_min": "24.13",
+                  "value_max": "62.64",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "0",
-                  "value_max": "453",
+                  "value_min": "70",
+                  "value_max": "543",
                   "value_type": "range"
                 }
               ]
@@ -1376,37 +1397,16 @@
                   "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
                   "property_name": "SetTemperature",
                   "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "0",
-                  "value_max": "64",
+                  "value_min": "20.67",
+                  "value_max": "64.8",
                   "value_type": "range"
                 },
                 {
                   "property_id": "http://www.w3.org/2006/time#Duration",
                   "property_name": "HoldingTime",
                   "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "0",
-                  "value_max": "600",
-                  "value_type": "range"
-                }
-              ]
-            },
-            {
-              "capability_name": "HeatingRamp",
-              "matched_properties": [
-                {
-                  "property_id": "http://qudt.org/vocab/quantitykind/Temperature",
-                  "property_name": "SetTemperature",
-                  "property_unit": "http://si-digital-framework.org/SI/units/degreeCelsius",
-                  "value_min": "0",
-                  "value_max": "100",
-                  "value_type": "range"
-                },
-                {
-                  "property_id": "http://www.w3.org/2006/time#Duration",
-                  "property_name": "HoldingTime",
-                  "property_unit": "http://si-digital-framework.org/SI/units/second",
-                  "value_min": "0",
-                  "value_max": "600",
+                  "value_min": "188",
+                  "value_max": "409",
                   "value_type": "range"
                 }
               ]
