@@ -1,4 +1,3 @@
-
 # gui.py
 # -*- coding: utf-8 -*-
 import sys
@@ -8,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict
 
 # ---------------------------------------------------------
-# [CRITICAL FIX] macOS Bundle Startup Fixes
+# [CRITICAL FIX] Bundle Startup Fixes
 # ---------------------------------------------------------
 if getattr(sys, 'frozen', False):
     bundle_dir = sys._MEIPASS
@@ -25,11 +24,11 @@ if getattr(sys, 'frozen', False):
 # IMPORTS
 # ---------------------------------------------------------
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QTextCursor, QBrush
+from PyQt6.QtGui import QColor, QTextCursor, QBrush, QFont
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QProgressBar, QTableWidgetItem, QHeaderView,
-    QFileDialog, QSlider
+    QFileDialog, QSlider, QFrame
 )
 
 from qfluentwidgets import (
@@ -39,6 +38,42 @@ from qfluentwidgets import (
     SwitchButton, TableWidget, TitleLabel, SubtitleLabel, Slider,
     DoubleSpinBox
 )
+
+# ---------------------------------------------------------
+# CUSTOM UI COMPONENTS
+# ---------------------------------------------------------
+
+class ZoneSlider(Slider):
+    """
+    A custom slider that defines specific click zones:
+    - 0%  - 35%: Index 0 (Fast)
+    - 35% - 65%: Index 1 (Pro)
+    - 65% - 100%: Index 2 (Ultra)
+    """
+    def mousePressEvent(self, event):
+        if self.orientation() == Qt.Orientation.Horizontal:
+            # Calculate click ratio (0.0 to 1.0)
+            ratio = event.pos().x() / self.width()
+            
+            val = 1 # Default Pro
+            
+            if ratio < 0.35:
+                val = 0 # Fast (Left 35%)
+            elif ratio > 0.65:
+                val = 2 # Ultra (Right 35%)
+            else:
+                val = 1 # Pro (Middle 30%)
+            
+            # Set value and trigger signals
+            self.setValue(val)
+            event.accept()
+            
+            # If you want to allow dragging after click, we could call super(),
+            # but for a mode switcher, 'jump to spot' is usually better.
+            # super().mousePressEvent(event) 
+        else:
+            super().mousePressEvent(event)
+
 
 # ---------------------------------------------------------
 # IMPORT USER FUNCTIONS
@@ -335,31 +370,65 @@ class HomePage(QWidget):
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
-        # Mode Slider
+        # --- Mode Slider Section ---
         self.card_opts = CardWidget(self)
         l_opts = QHBoxLayout(self.card_opts)
         icon_opts = IconWidget(FluentIcon.SPEED_HIGH, self)
         
         v_opts = QVBoxLayout()
         self.lbl_opts = BodyLabel("Optimization Mode", self)
-        self.lbl_opts_desc = CaptionLabel("Fast (1 Sol)  |  Pro (All Sols)  |  Ultra (Optimal)", self)
-        v_opts.addWidget(self.lbl_opts)
-        v_opts.addWidget(self.lbl_opts_desc)
         
-        self.slider_mode = Slider(Qt.Orientation.Horizontal, self)
+        # 1. Container for Slider and Ticks
+        v_slider_container = QVBoxLayout()
+        v_slider_container.setSpacing(5)
+        
+        # 2. The Custom Slider (ZoneSlider)
+        # [MODIFIED] Using ZoneSlider instead of Slider
+        self.slider_mode = ZoneSlider(Qt.Orientation.Horizontal, self)
         self.slider_mode.setRange(0, 2)
         self.slider_mode.setPageStep(1)
         self.slider_mode.setSingleStep(1)
         self.slider_mode.setValue(0) # Default: Fast
-        
         self.slider_mode.setFixedWidth(200)
         self.slider_mode.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.slider_mode.setTickInterval(1)
         self.slider_mode.valueChanged.connect(self.update_ui_state)
         
+        v_slider_container.addWidget(self.slider_mode)
+        
+        # 3. The Labels Below (Fast - Pro - Ultra)
+        h_labels = QHBoxLayout()
+        h_labels.setContentsMargins(0,0,0,0)
+        
+        lbl_fast = CaptionLabel("Fast", self)
+        lbl_pro = CaptionLabel("Pro", self)
+        lbl_ultra = CaptionLabel("Ultra", self)
+        
+        font = QFont()
+        font.setPointSize(13) # Increased size
+        lbl_fast.setFont(font)
+        lbl_pro.setFont(font)
+        lbl_ultra.setFont(font)
+        
+        # Alignment
+        lbl_fast.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        lbl_pro.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_ultra.setAlignment(Qt.AlignmentFlag.AlignRight)
+        
+        h_labels.addWidget(lbl_fast)
+        h_labels.addWidget(lbl_pro)
+        h_labels.addWidget(lbl_ultra)
+        
+        v_slider_container.addLayout(h_labels)
+        
+        self.lbl_opts_desc = CaptionLabel("Fast (1 Sol)", self)
+        v_opts.addWidget(self.lbl_opts)
+        v_opts.addWidget(self.lbl_opts_desc)
+        
         l_opts.addWidget(icon_opts)
-        l_opts.addLayout(v_opts, 1)
-        l_opts.addWidget(self.slider_mode)
+        l_opts.addLayout(v_opts, 1) 
+        l_opts.addLayout(v_slider_container) 
+        
         layout.addWidget(self.card_opts)
 
         # Big Button
@@ -368,7 +437,7 @@ class HomePage(QWidget):
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
 
-        # Progress Bar
+        # Progress Bar (Standard)
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
         layout.addWidget(self.pbar)
@@ -379,16 +448,15 @@ class HomePage(QWidget):
         self.update_ui_state(0)
 
     def update_ui_state(self, val):
-        """Update colors, text, and visibility based on slider value immediately"""
+        """Update colors and text based on slider value immediately"""
         modes = ["Fast", "Pro", "Ultra"]
         mode_text = modes[val]
         
-        # 1. Update Settings Visibility
-        # Show weights ONLY if Ultra (2)
+        # Update Settings Visibility
         if self.settings_page:
             self.settings_page.set_weights_visible(val == 2)
 
-        # 2. Define colors (Green, Blue, Orange)
+        # Define colors (Green, Blue, Orange)
         if val == 0: # Fast - Green
             color_hex = "#107C10" 
             desc = "Fast (Single Solution)"
@@ -402,7 +470,7 @@ class HomePage(QWidget):
         self.lbl_opts_desc.setText(desc)
         self.btn_run.setText(f"Start Calculation in {mode_text} Mode")
         
-        # 3. Apply Styling
+        # Button Styling
         btn_style = f"""
             PrimaryPushButton {{
                 background-color: {color_hex};
@@ -415,7 +483,7 @@ class HomePage(QWidget):
                 font-family: 'Segoe UI', sans-serif;
             }}
             PrimaryPushButton:hover {{
-                background-color: {color_hex};
+                background-color: {color_hex}; 
                 border: 1px solid {color_hex};
             }}
             PrimaryPushButton:pressed {{
@@ -424,13 +492,14 @@ class HomePage(QWidget):
             }}
             PrimaryPushButton:disabled {{
                 background-color: {color_hex};
-                opacity: 0.5;
+                opacity: 0.5; 
                 border: 1px solid {color_hex};
                 color: rgba(255, 255, 255, 0.8);
             }}
         """
         self.btn_run.setStyleSheet(btn_style)
         
+        # Slider Styling
         slider_style = f"""
             Slider::groove:horizontal {{
                 height: 4px; 
@@ -549,15 +618,12 @@ class SettingsPage(QWidget):
         l_weights.addLayout(r3)
         layout.addWidget(self.card_weights)
         
-        # Default state: Hidden
         self.card_weights.setVisible(False)
         
-        # Connect signals for auto-balancing
         self.spin_energy.valueChanged.connect(lambda v: self.balance_weights(self.spin_energy, v))
         self.spin_use.valueChanged.connect(lambda v: self.balance_weights(self.spin_use, v))
         self.spin_co2.valueChanged.connect(lambda v: self.balance_weights(self.spin_co2, v))
         
-        # Store previous values to calculate delta
         self.prev_vals = {
             self.spin_energy: 0.4,
             self.spin_use: 0.3,
@@ -567,34 +633,23 @@ class SettingsPage(QWidget):
         layout.addStretch()
 
     def set_weights_visible(self, visible: bool):
-        """Called by HomePage slider to toggle visibility"""
         self.card_weights.setVisible(visible)
 
     def balance_weights(self, source_spin, new_val):
-        """Ensure sum remains 1.0 by adjusting other two weights"""
         old_val = self.prev_vals[source_spin]
         delta = new_val - old_val
-        
-        # Update stored value
         self.prev_vals[source_spin] = new_val
         
         if abs(delta) < 0.0001: return
         
-        # Identify other spinners
         others = [s for s in [self.spin_energy, self.spin_use, self.spin_co2] if s != source_spin]
-        
-        # Distribute -delta equally among others (half each)
-        # Block signals to prevent recursion
         for s in others: s.blockSignals(True)
-        
-        # Adjustment per spinner
         adjustment = delta / 2.0
         
-        # Apply
         for s in others:
             curr = s.value()
             s.setValue(max(0.0, min(1.0, curr - adjustment)))
-            self.prev_vals[s] = s.value() # Update their stored state too
+            self.prev_vals[s] = s.value()
             
         for s in others: s.blockSignals(False)
 
