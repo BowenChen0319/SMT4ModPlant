@@ -372,11 +372,11 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
                 solution_json = solution_to_json(model, process_steps, resources, step_resource_to_caps_props, Assignment, recipe_data, capabilities_data, valid_solution_count)
                 all_json_solutions.append(solution_json)
                 
-                try:
-                    with open('solutions.json', 'w', encoding='utf-8') as f:
-                        json.dump({"total_solutions": len(all_json_solutions), "solutions": all_json_solutions}, f, indent=2, ensure_ascii=False)
-                except Exception as e:
-                    log_callback(f"Error saving solutions.json: {e}")
+                # try:
+                #     with open('solutions.json', 'w', encoding='utf-8') as f:
+                #         json.dump({"total_solutions": len(all_json_solutions), "solutions": all_json_solutions}, f, indent=2, ensure_ascii=False)
+                # except Exception as e:
+                #     log_callback(f"Error saving solutions.json: {e}")
 
             if valid_solution_count > 1:
                 all_results_for_gui.append({})
