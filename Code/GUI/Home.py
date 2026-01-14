@@ -7,20 +7,12 @@ from qfluentwidgets import (
     CardWidget, IconWidget, BodyLabel, CaptionLabel, 
     PrimaryPushButton, PushButton, Slider, 
     TitleLabel, FluentIcon, InfoBar, InfoBarPosition, setThemeColor,
-    FluentWindow  # 确保这里导入了 FluentWindow
+    FluentWindow
 )
 
-# Import Worker
 from Code.GUI.Workers import SMTWorker
 
-# --- Custom Zone Slider Class ---
 class ZoneSlider(Slider):
-    """
-    A custom slider that defines specific click zones:
-    - 0%  - 35%: Index 0 (Fast)
-    - 35% - 65%: Index 1 (Pro)
-    - 65% - 100%: Index 2 (Ultra)
-    """
     def mousePressEvent(self, event):
         if self.orientation() == Qt.Orientation.Horizontal:
             ratio = event.pos().x() / self.width()
@@ -85,7 +77,7 @@ class HomePage(QWidget):
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
-        # --- Mode Slider Section ---
+        # Mode Slider
         self.card_opts = CardWidget(self)
         l_opts = QHBoxLayout(self.card_opts)
         icon_opts = IconWidget(FluentIcon.SPEED_HIGH, self)
@@ -93,16 +85,14 @@ class HomePage(QWidget):
         v_opts = QVBoxLayout()
         self.lbl_opts = BodyLabel("Optimization Mode", self)
         
-        # 1. Container for Slider and Ticks
         v_slider_container = QVBoxLayout()
         v_slider_container.setSpacing(5)
         
-        # 2. The Custom Slider (ZoneSlider)
         self.slider_mode = ZoneSlider(Qt.Orientation.Horizontal, self)
         self.slider_mode.setRange(0, 2)
         self.slider_mode.setPageStep(1)
         self.slider_mode.setSingleStep(1)
-        self.slider_mode.setValue(0) # Default: Fast
+        self.slider_mode.setValue(0)
         self.slider_mode.setFixedWidth(200)
         self.slider_mode.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.slider_mode.setTickInterval(1)
@@ -110,29 +100,22 @@ class HomePage(QWidget):
         
         v_slider_container.addWidget(self.slider_mode)
         
-        # 3. The Labels Below (Fast - Pro - Ultra)
         h_labels = QHBoxLayout()
         h_labels.setContentsMargins(0,0,0,0)
-        
         lbl_fast = CaptionLabel("Fast", self)
         lbl_pro = CaptionLabel("Pro", self)
         lbl_ultra = CaptionLabel("Ultra", self)
-        
         font = QFont()
-        font.setPointSize(13) # Increased size
+        font.setPointSize(13)
         lbl_fast.setFont(font)
         lbl_pro.setFont(font)
         lbl_ultra.setFont(font)
-        
-        # Alignment
         lbl_fast.setAlignment(Qt.AlignmentFlag.AlignLeft)
         lbl_pro.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl_ultra.setAlignment(Qt.AlignmentFlag.AlignRight)
-        
         h_labels.addWidget(lbl_fast)
         h_labels.addWidget(lbl_pro)
         h_labels.addWidget(lbl_ultra)
-        
         v_slider_container.addLayout(h_labels)
         
         self.lbl_opts_desc = CaptionLabel("Fast (1 Sol)", self)
@@ -142,49 +125,41 @@ class HomePage(QWidget):
         l_opts.addWidget(icon_opts)
         l_opts.addLayout(v_opts, 1) 
         l_opts.addLayout(v_slider_container) 
-        
         layout.addWidget(self.card_opts)
 
-        # Big Button
         self.btn_run = PrimaryPushButton("Start Calculation in Fast Mode", self)
         self.btn_run.setEnabled(False)
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
 
-        # Progress Bar (Standard)
         self.pbar = QProgressBar(self)
         self.pbar.setValue(0)
         layout.addWidget(self.pbar)
         
         layout.addStretch()
         
-        # Initialize UI state (Default: Fast/Green)
         self.update_ui_state(0)
 
     def update_ui_state(self, val):
-        """Update colors and text based on slider value immediately"""
         modes = ["Fast", "Pro", "Ultra"]
         mode_text = modes[val]
         
-        # Update Settings Visibility
         if self.settings_page:
             self.settings_page.set_weights_visible(val == 2)
 
-        # Define colors (Green, Blue, Orange)
-        if val == 0: # Fast - Green
+        if val == 0: 
             color_hex = "#107C10" 
             desc = "Fast (Single Solution)"
-        elif val == 1: # Pro - Blue (IAT style)
+        elif val == 1: 
             color_hex = "#00629B"
             desc = "Pro (All Valid Solutions)"
-        else: # Ultra - Orange
+        else: 
             color_hex = "#FF8C00" 
             desc = "Ultra (Cost Optimization)"
 
         self.lbl_opts_desc.setText(desc)
         self.btn_run.setText(f"Start Calculation in {mode_text} Mode")
         
-        # Button Styling
         btn_style = f"""
             PrimaryPushButton {{
                 background-color: {color_hex};
@@ -213,7 +188,11 @@ class HomePage(QWidget):
         """
         self.btn_run.setStyleSheet(btn_style)
         
-        # Slider Styling
+        # [NEW] Notify Results Page about color change
+        main_win = self.window()
+        if isinstance(main_win, FluentWindow) and hasattr(main_win, 'results_page'):
+            main_win.results_page.set_export_button_color(color_hex)
+        
         slider_style = f"""
             Slider::groove:horizontal {{
                 height: 4px; 
@@ -267,15 +246,12 @@ class HomePage(QWidget):
         self.worker.finished_signal.connect(self.on_finished)
         self.worker.start()
 
-    def on_finished(self, results):
+    def on_finished(self, results, context_data):
         self.btn_run.setEnabled(True)
         main = self.window()
-        
-        # [CRITICAL FIX] Check against FluentWindow (base class) instead of MainWindow
-        # because MainWindow is not available in this scope.
         if isinstance(main, FluentWindow):
-            # Check if attributes exist just to be safe
             if hasattr(main, 'results_page') and hasattr(main, 'switchTo'):
-                main.results_page.update_table(results)
+                # Pass both gui data and context data
+                main.results_page.set_data(results, context_data)
                 main.switchTo(main.results_page)
                 InfoBar.success(title="Completed", content=f"Calculation finished.", parent=main, position=InfoBarPosition.TOP_RIGHT)

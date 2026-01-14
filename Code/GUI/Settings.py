@@ -1,9 +1,10 @@
 # Code/GUI/Settings.py
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+import os
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 from qfluentwidgets import (
-    CardWidget, IconWidget, BodyLabel, SwitchButton, 
+    CardWidget, IconWidget, BodyLabel, SwitchButton, CaptionLabel,
     TitleLabel, SubtitleLabel, DoubleSpinBox, 
-    FluentIcon, setTheme, Theme
+    FluentIcon, setTheme, Theme, LineEdit, PushButton
 )
 
 class SettingsPage(QWidget):
@@ -30,6 +31,43 @@ class SettingsPage(QWidget):
         l_theme.addStretch(1)
         l_theme.addWidget(self.switch_theme)
         layout.addWidget(self.card_theme)
+        
+        # --- [NEW] Export Path Setting ---
+        self.card_path = CardWidget(self)
+        l_path = QVBoxLayout(self.card_path)
+        l_path.setContentsMargins(20, 20, 20, 20)
+        
+        path_header = QHBoxLayout()
+        icon_path = IconWidget(FluentIcon.SAVE, self)
+        lbl_path_title = SubtitleLabel("Export Directory", self)
+        self.switch_custom_path = SwitchButton(self)
+        self.switch_custom_path.setOnText("Custom")
+        self.switch_custom_path.setOffText("Default (Downloads)")
+        self.switch_custom_path.checkedChanged.connect(self.toggle_path_mode)
+        
+        path_header.addWidget(icon_path)
+        path_header.addWidget(lbl_path_title)
+        path_header.addStretch(1)
+        path_header.addWidget(self.switch_custom_path)
+        
+        # Path Selection Row
+        path_selection = QHBoxLayout()
+        self.line_path = LineEdit(self)
+        self.line_path.setReadOnly(True)
+        # Default path
+        self.default_path = os.path.expanduser("~/Downloads")
+        self.line_path.setText(self.default_path)
+        
+        self.btn_browse = PushButton("Browse", self)
+        self.btn_browse.clicked.connect(self.browse_path)
+        self.btn_browse.setEnabled(False) # Disabled by default
+        
+        path_selection.addWidget(self.line_path)
+        path_selection.addWidget(self.btn_browse)
+        
+        l_path.addLayout(path_header)
+        l_path.addLayout(path_selection)
+        layout.addWidget(self.card_path)
         
         # Weights (Initially Hidden)
         self.card_weights = CardWidget(self)
@@ -74,6 +112,19 @@ class SettingsPage(QWidget):
         
         layout.addStretch()
 
+    def toggle_path_mode(self, checked):
+        self.btn_browse.setEnabled(checked)
+        if not checked:
+            self.line_path.setText(self.default_path)
+
+    def browse_path(self):
+        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", self.line_path.text())
+        if d:
+            self.line_path.setText(d)
+
+    def get_export_path(self):
+        return self.line_path.text()
+
     def set_weights_visible(self, visible: bool):
         self.card_weights.setVisible(visible)
 
@@ -81,18 +132,14 @@ class SettingsPage(QWidget):
         old_val = self.prev_vals[source_spin]
         delta = new_val - old_val
         self.prev_vals[source_spin] = new_val
-        
         if abs(delta) < 0.0001: return
-        
         others = [s for s in [self.spin_energy, self.spin_use, self.spin_co2] if s != source_spin]
         for s in others: s.blockSignals(True)
         adjustment = delta / 2.0
-        
         for s in others:
             curr = s.value()
             s.setValue(max(0.0, min(1.0, curr - adjustment)))
             self.prev_vals[s] = s.value()
-            
         for s in others: s.blockSignals(False)
 
     def toggle_theme(self, checked):
