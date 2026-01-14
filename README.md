@@ -19,7 +19,26 @@ The tool provides a modern GUI to visualize matching solutions, optimize resourc
 
 ---
 
-## 🛠️ Installation
+## 📥 Installation
+
+### 1. Download Executable
+You do not need to install Python to use this tool.
+* Go to the **[Releases](../../releases)** page.
+* Download the latest **`SMT4ModPlant.exe`**.
+
+### 2. (Optional) Download Examples
+For testing, you can also download the example files provided in the repository:
+* **Example General Recipes** (XML)
+* **Example AAS Resources** (XML/AASX)
+
+### 3. Run
+Simply double-click `SMT4ModPlant.exe` to launch the application.
+
+---
+
+## 🛠️ Compilation & Development
+
+If you want to run the source code or compile it yourself, please follow these steps.
 
 ### Prerequisites
 * **Python 3.10+** is required.
@@ -36,18 +55,20 @@ pip install z3-solver PyQt6
 
 ```
 
+### Run from Source
+
+```bash
+python gui_main.py
+
+```
+
 ---
 
 ## 🚀 How to Use
 
 ### 1. Launch the Application
 
-Run the main script from your project root:
-
-```bash
-python gui_main.py
-
-```
+Run the downloaded `.exe` file or the python script.
 
 ### 2. Select Inputs
 
@@ -90,10 +111,8 @@ Click the large **Start Calculation** button. The progress bar will show the sta
 
 
 
-
 ---
 
 ## 📝 License
 
-[MIT License](https://www.google.com/search?q=LICENSE)
-
+[MIT License](https://en.wikipedia.org/wiki/MIT_License)
