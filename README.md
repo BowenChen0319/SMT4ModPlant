@@ -52,14 +52,12 @@ pip install "PyQt6-Fluent-Widgets[full]" -i [https://pypi.org/simple/](https://p
 
 # 2. Install SMT Solver and Qt Bindings
 pip install z3-solver PyQt6
-
 ```
 
 ### Run from Source
 
 ```bash
 python gui_main.py
-
 ```
 
 ---
@@ -110,6 +108,14 @@ Click the large **Start Calculation** button. The progress bar will show the sta
 *(Weights automatically balance to sum to 1.0)*
 
 
+
+---
+
+## 👥 Contributors
+
+* **Bowen Chen**, RWTH Aachen, Chair of Information and Automation Systems for Process and Material Technology
+* **Michael Winter**, RWTH Aachen, Chair of Information and Automation Systems for Process and Material Technology
+* **Yafan Wu**, RWTH Aachen
 
 ---
 
