@@ -118,7 +118,22 @@ Click the large **Start Calculation** button. The progress bar will show the sta
 * **Yafan Wu**, RWTH Aachen
 
 ---
+## 📄 License & Acknowledgments
 
-## 📝 License
+### Project License
 
-[MIT License](https://en.wikipedia.org/wiki/MIT_License)
+The source code of **SMT4ModPlant** is released under the **[MIT License](LICENSE.txt)**.
+
+### Third-Party Components
+
+This project utilizes third-party libraries which are distributed under their respective licenses:
+
+* **[PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)**:
+* Used for the Graphical User Interface.
+* Licensed under **GPLv3** for non-commercial use. (Commercial use requires a commercial license).
+* *Note: This project is for academic/non-commercial research purposes.*
+
+
+* **[Z3 Theorem Prover](https://github.com/Z3Prover/z3)**:
+* Used for SMT solving and optimization.
+* Licensed under the **MIT License**.
