@@ -47,11 +47,11 @@ If you want to run the source code or compile it yourself, please follow these s
 Please run the following commands in your terminal to install the required packages:
 
 ```bash
-# 1. Install GUI Framework (Fluent Widgets)
-pip install "PyQt6-Fluent-Widgets[full]" -i [https://pypi.org/simple/](https://pypi.org/simple/)
-
-# 2. Install SMT Solver and Qt Bindings
+# 1. Install SMT Solver and Qt Bindings
 pip install z3-solver PyQt6
+
+# 2. Install GUI Framework (Fluent Widgets)
+pip install "PyQt6-Fluent-Widgets[full]" -i https://pypi.org/simple/
 ```
 
 ### Run from Source
