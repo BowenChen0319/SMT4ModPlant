@@ -24,12 +24,11 @@ The tool provides a modern GUI to visualize matching solutions, optimize resourc
 ### 1. Download Executable
 You do not need to install Python to use this tool.
 * Go to the **[Releases](../../releases)** page.
-* Download the latest **`SMT4ModPlant.exe`**.
+* Download the latest **`SMT4ModPlant.exe`** for Windows.
+* Or the **`SMT4ModPlant.zip`** archive for macOS.
 
 ### 2. (Optional) Download Examples
-For testing, you can also download the example files provided in the repository:
-* **Example General Recipes** (XML)
-* **Example AAS Resources** (XML/AASX)
+For testing, you can also download the example files provided in the repository. Both **Example General Recipes** (XML) and **Example AAS Resources** (XML/AASX) are included in the **`Test-Recipe&AAS.zip`** archive.
 
 ### 3. Run
 Simply double-click `SMT4ModPlant.exe` to launch the application.
