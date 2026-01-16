@@ -25,10 +25,8 @@ class SettingsPage(QWidget):
         # =============================================
         self.card_theme = CardWidget(self)
         l_theme = QHBoxLayout(self.card_theme)
-        # 统一外层边距 20
         l_theme.setContentsMargins(20, 20, 20, 20)
         
-        # [修改] 去掉图标，纯文字，保证绝对左对齐
         lbl_theme = SubtitleLabel("Dark Mode", self)
         
         self.switch_theme = SwitchButton(self)
@@ -45,14 +43,14 @@ class SettingsPage(QWidget):
         # =============================================
         self.card_path = CardWidget(self)
         l_path = QVBoxLayout(self.card_path)
-        # 统一外层边距 20
+
         l_path.setContentsMargins(20, 20, 20, 20)
-        # 统一内部元素间距
+
         l_path.setSpacing(10) 
         
         # Header
         path_header = QHBoxLayout()
-        # [关键] 内部布局边距设为0，防止缩进
+
         path_header.setContentsMargins(0, 0, 0, 0)
         
         lbl_path_title = SubtitleLabel("Export Directory", self)
@@ -68,7 +66,7 @@ class SettingsPage(QWidget):
         
         # Path Selection Row
         path_selection = QHBoxLayout()
-        # [关键] 内部布局边距设为0，确保输入框和标题左侧对齐
+
         path_selection.setContentsMargins(0, 0, 0, 0)
         
         self.line_path = LineEdit(self)
@@ -93,13 +91,13 @@ class SettingsPage(QWidget):
         # =============================================
         self.card_weights = CardWidget(self)
         l_weights = QVBoxLayout(self.card_weights)
-        # 统一外层边距 20
+
         l_weights.setContentsMargins(20, 20, 20, 20)
         l_weights.setSpacing(10)
         
         # Header
         weights_header = QHBoxLayout()
-        # [关键] 内部布局边距设为0
+
         weights_header.setContentsMargins(0, 0, 0, 0)
         
         w_title = SubtitleLabel("Optimization Weights (Sum = 1.0)", self)
@@ -111,7 +109,7 @@ class SettingsPage(QWidget):
         # Helper to create weight rows
         def create_weight_row(label, default_val):
             row = QHBoxLayout()
-            # [关键] 内部布局边距设为0，确保 "Energy..." 和标题 "Optimization..." 左对齐
+
             row.setContentsMargins(0, 0, 0, 0)
             
             lbl = BodyLabel(label, self)
