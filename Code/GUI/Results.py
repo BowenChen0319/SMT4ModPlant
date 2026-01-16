@@ -166,25 +166,25 @@ class ResultsPage(QWidget):
                         has_score = True
                     break
         
-        if has_score:
-            filtered_data = []
-            temp_block = []
-            for row in data:
-                if not row:
-                    if temp_block:
-                        score = temp_block[0].get('composite_score', 0)
-                        if score > 0:
-                            if filtered_data: filtered_data.append({}) 
-                            filtered_data.extend(temp_block)
-                        temp_block = []
-                else:
-                    temp_block.append(row)
-            if temp_block:
-                score = temp_block[0].get('composite_score', 0)
-                if score > 0:
-                    if filtered_data: filtered_data.append({})
-                    filtered_data.extend(temp_block)
-            data = filtered_data
+        # if has_score:
+        #     filtered_data = []
+        #     temp_block = []
+        #     for row in data:
+        #         if not row:
+        #             if temp_block:
+        #                 score = temp_block[0].get('composite_score', 0)
+        #                 if score > 0:
+        #                     if filtered_data: filtered_data.append({}) 
+        #                     filtered_data.extend(temp_block)
+        #                 temp_block = []
+        #         else:
+        #             temp_block.append(row)
+        #     if temp_block:
+        #         score = temp_block[0].get('composite_score', 0)
+        #         if score > 0:
+        #             if filtered_data: filtered_data.append({})
+        #             filtered_data.extend(temp_block)
+        #     data = filtered_data
             
         if has_score:
             headers = ["Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
