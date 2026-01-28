@@ -48,5 +48,6 @@ class MainWindow(FluentWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = MainWindow()
-    w.show()
+    # w.show()
+    w.showMaximized()  
     sys.exit(app.exec())
