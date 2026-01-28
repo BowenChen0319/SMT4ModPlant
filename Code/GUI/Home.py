@@ -1,52 +1,60 @@
 # Code/GUI/Home.py
 import os
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QSlider, QProgressBar 
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QProgressBar
+)
 from qfluentwidgets import (
     CardWidget, IconWidget, BodyLabel, CaptionLabel, 
-    PrimaryPushButton, PushButton, Slider, 
-    TitleLabel, FluentIcon, InfoBar, InfoBarPosition, setThemeColor,
-    FluentWindow
+    PrimaryPushButton, PushButton, CheckBox,
+    TitleLabel, SubtitleLabel, FluentIcon, InfoBar, InfoBarPosition, setThemeColor,
+    FluentWindow, SwitchButton, LineEdit, DoubleSpinBox, setTheme, Theme
 )
 
 from Code.GUI.Workers import SMTWorker
 
-class ZoneSlider(Slider):
-    def mousePressEvent(self, event):
-        if self.orientation() == Qt.Orientation.Horizontal:
-            ratio = event.pos().x() / self.width()
-            val = 1 
-            if ratio < 0.35: val = 0 
-            elif ratio > 0.65: val = 2 
-            else: val = 1 
-            self.setValue(val)
-            event.accept()
-        else:
-            super().mousePressEvent(event)
-
 class HomePage(QWidget):
-    def __init__(self, log_callback, settings_page, parent=None):
+    def __init__(self, log_callback, parent=None):
         super().__init__(parent)
         self.setObjectName("home_page")
         self.log_callback = log_callback
-        self.settings_page = settings_page
+        
+        # 初始化变量
         self.recipe_path = ""
         self.resource_dir = ""
+        self.default_export_path = os.path.expanduser("~/Downloads")
+        self.mode_index = 0 # 0=SMT(Fast), 2=OPT(Ultra)
+        
+        # 权重相关变量
+        self.prev_vals = {}
         
         setThemeColor("#00629B")
         
+        self.init_ui()
+        
+    def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
+        layout.setSpacing(15) 
 
+        # --- Header (Title Only) ---
+        # [修改] 移除了 Dark Mode 开关，只保留标题
+        header_layout = QHBoxLayout()
+        v_title = QVBoxLayout()
         title = TitleLabel("SMT4ModPlant Orchestrator", self)
         desc = CaptionLabel("Resource matching tool based on General Recipe and AAS Capabilities.", self)
-        desc.setStyleSheet("color: #666;") 
-        layout.addWidget(title)
-        layout.addWidget(desc)
+        # 在深色模式下，#666 可能稍暗，这里稍微调亮一点以保证可读性
+        desc.setStyleSheet("color: #999;") 
+        v_title.addWidget(title)
+        v_title.addWidget(desc)
+        
+        header_layout.addLayout(v_title)
+        header_layout.addStretch(1)
+        layout.addLayout(header_layout)
 
-        # File Inputs
+        # =================================================
+        # 1. General Recipe XML
+        # =================================================
         self.card_recipe = CardWidget(self)
         l1 = QHBoxLayout(self.card_recipe)
         icon1 = IconWidget(FluentIcon.DOCUMENT, self)
@@ -62,6 +70,9 @@ class HomePage(QWidget):
         l1.addWidget(btn1)
         layout.addWidget(self.card_recipe)
 
+        # =================================================
+        # 2. Resources Directory
+        # =================================================
         self.card_res = CardWidget(self)
         l2 = QHBoxLayout(self.card_res)
         icon2 = IconWidget(FluentIcon.FOLDER, self)
@@ -77,57 +88,137 @@ class HomePage(QWidget):
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
-        # Mode Slider
-        self.card_opts = CardWidget(self)
-        l_opts = QHBoxLayout(self.card_opts)
-        icon_opts = IconWidget(FluentIcon.SPEED_HIGH, self)
-        
-        v_opts = QVBoxLayout()
-        self.lbl_opts = BodyLabel("Optimization Mode", self)
-        
-        v_slider_container = QVBoxLayout()
-        v_slider_container.setSpacing(5)
-        
-        self.slider_mode = ZoneSlider(Qt.Orientation.Horizontal, self)
-        self.slider_mode.setRange(0, 2)
-        self.slider_mode.setPageStep(1)
-        self.slider_mode.setSingleStep(1)
-        self.slider_mode.setValue(0)
-        self.slider_mode.setFixedWidth(200)
-        self.slider_mode.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.slider_mode.setTickInterval(1)
-        self.slider_mode.valueChanged.connect(self.update_ui_state)
-        
-        v_slider_container.addWidget(self.slider_mode)
-        
-        h_labels = QHBoxLayout()
-        h_labels.setContentsMargins(0,0,0,0)
-        lbl_fast = CaptionLabel("Fast", self)
-        lbl_pro = CaptionLabel("Pro", self)
-        lbl_ultra = CaptionLabel("Ultra", self)
-        font = QFont()
-        font.setPointSize(13)
-        lbl_fast.setFont(font)
-        lbl_pro.setFont(font)
-        lbl_ultra.setFont(font)
-        lbl_fast.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        lbl_pro.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_ultra.setAlignment(Qt.AlignmentFlag.AlignRight)
-        h_labels.addWidget(lbl_fast)
-        h_labels.addWidget(lbl_pro)
-        h_labels.addWidget(lbl_ultra)
-        v_slider_container.addLayout(h_labels)
-        
-        self.lbl_opts_desc = CaptionLabel("Fast (1 Sol)", self)
-        v_opts.addWidget(self.lbl_opts)
-        v_opts.addWidget(self.lbl_opts_desc)
-        
-        l_opts.addWidget(icon_opts)
-        l_opts.addLayout(v_opts, 1) 
-        l_opts.addLayout(v_slider_container) 
-        layout.addWidget(self.card_opts)
+        # =================================================
+        # 3. Export Directory
+        # =================================================
+        self.card_export = CardWidget(self)
+        l_export = QVBoxLayout(self.card_export)
+        l_export.setContentsMargins(20, 15, 20, 15)
+        l_export.setSpacing(10)
 
-        self.btn_run = PrimaryPushButton("Start Calculation in Fast Mode", self)
+        # Header Line: Icon + Title + Switch
+        exp_header = QHBoxLayout()
+        exp_header.setContentsMargins(0,0,0,0)
+        icon_exp = IconWidget(FluentIcon.SAVE, self)
+        lbl_exp_title = SubtitleLabel("Export Directory", self)
+        
+        self.switch_custom_path = SwitchButton(self)
+        self.switch_custom_path.setOnText("Custom")
+        self.switch_custom_path.setOffText("Default (Downloads)")
+        self.switch_custom_path.checkedChanged.connect(self.toggle_path_mode)
+        
+        exp_header.addWidget(icon_exp)
+        exp_header.addWidget(lbl_exp_title)
+        exp_header.addStretch(1)
+        exp_header.addWidget(self.switch_custom_path)
+        
+        # Path Line: LineEdit + Browse Button
+        exp_selection = QHBoxLayout()
+        exp_selection.setContentsMargins(0,0,0,0)
+        self.line_path = LineEdit(self)
+        self.line_path.setReadOnly(True)
+        self.line_path.setText(self.default_export_path)
+        
+        self.btn_browse_path = PushButton("Browse", self)
+        self.btn_browse_path.clicked.connect(self.browse_path)
+        self.btn_browse_path.setEnabled(False) 
+        
+        exp_selection.addWidget(self.line_path)
+        exp_selection.addWidget(self.btn_browse_path)
+        
+        l_export.addLayout(exp_header)
+        l_export.addLayout(exp_selection)
+        layout.addWidget(self.card_export)
+
+        # =================================================
+        # 4. Optimization Mode (SMT vs OPT)
+        # =================================================
+        self.card_mode = CardWidget(self)
+        l_mode = QHBoxLayout(self.card_mode)
+        l_mode.setContentsMargins(20, 20, 20, 20)
+        
+        icon_mode = IconWidget(FluentIcon.SPEED_HIGH, self)
+        lbl_mode = SubtitleLabel("Optimization Mode", self)
+        
+        # Checkboxes acting like Radio Buttons
+        self.cb_smt = CheckBox("SMT (Fast)", self)
+        self.cb_opt = CheckBox("OPT (Ultra)", self)
+        
+        # 默认选中 SMT
+        self.cb_smt.setChecked(True)
+        self.cb_opt.setChecked(False)
+        
+        # 连接信号
+        self.cb_smt.stateChanged.connect(self.on_smt_checked)
+        self.cb_opt.stateChanged.connect(self.on_opt_checked)
+        
+        l_mode.addWidget(icon_mode)
+        l_mode.addWidget(lbl_mode)
+        l_mode.addStretch(1)
+        l_mode.addWidget(self.cb_smt)
+        l_mode.addSpacing(20)
+        l_mode.addWidget(self.cb_opt)
+        
+        layout.addWidget(self.card_mode)
+
+        # =================================================
+        # 5. Optimization Weights (Initially Hidden)
+        # =================================================
+        self.card_weights = CardWidget(self)
+        l_weights = QVBoxLayout(self.card_weights)
+        l_weights.setContentsMargins(20, 20, 20, 20)
+        l_weights.setSpacing(10)
+        
+        # Header
+        w_header = QHBoxLayout()
+        w_header.setContentsMargins(0,0,0,0)
+        w_title = SubtitleLabel("Optimization Weights (Sum = 1.0)", self)
+        w_header.addWidget(w_title)
+        w_header.addStretch(1)
+        l_weights.addLayout(w_header)
+        
+        # Weights Rows
+        def create_weight_row(label, default_val):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            lbl = BodyLabel(label, self)
+            spin = DoubleSpinBox(self)
+            spin.setRange(0.0, 1.0)
+            spin.setSingleStep(0.1)
+            spin.setValue(default_val)
+            row.addWidget(lbl)
+            row.addStretch(1)
+            row.addWidget(spin)
+            return row, spin
+            
+        r1, self.spin_energy = create_weight_row("Energy Cost Weight", 0.4)
+        r2, self.spin_use = create_weight_row("Use Cost Weight", 0.3)
+        r3, self.spin_co2 = create_weight_row("CO2 Footprint Weight", 0.3)
+        
+        l_weights.addLayout(r1)
+        l_weights.addLayout(r2)
+        l_weights.addLayout(r3)
+        layout.addWidget(self.card_weights)
+        
+        # Initialize dictionary for auto-balancing
+        self.prev_vals = {
+            self.spin_energy: 0.4,
+            self.spin_use: 0.3,
+            self.spin_co2: 0.3
+        }
+        
+        # Connect signals for balancing
+        self.spin_energy.valueChanged.connect(lambda v: self.balance_weights(self.spin_energy, v))
+        self.spin_use.valueChanged.connect(lambda v: self.balance_weights(self.spin_use, v))
+        self.spin_co2.valueChanged.connect(lambda v: self.balance_weights(self.spin_co2, v))
+        
+        # 默认隐藏权重设置 (因为默认是 SMT 模式)
+        self.card_weights.setVisible(False)
+
+        # =================================================
+        # Run Button & Progress
+        # =================================================
+        self.btn_run = PrimaryPushButton("Start Calculation in SMT Mode", self)
         self.btn_run.setEnabled(False)
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
@@ -138,27 +229,54 @@ class HomePage(QWidget):
         
         layout.addStretch()
         
-        self.update_ui_state(0)
+        # 初始化 UI 状态颜色
+        self.update_run_button_style(0)
 
-    def update_ui_state(self, val):
-        modes = ["Fast", "Pro", "Ultra"]
-        mode_text = modes[val]
-        
-        if self.settings_page:
-            self.settings_page.set_weights_visible(val == 2)
+    # -----------------------------------------------------
+    # Logic: Mode Selection (SMT vs OPT)
+    # -----------------------------------------------------
+    def on_smt_checked(self, state):
+        if state == Qt.CheckState.Checked.value: # Checked
+            self.cb_opt.blockSignals(True)
+            self.cb_opt.setChecked(False)
+            self.cb_opt.blockSignals(False)
+            
+            self.mode_index = 0 # Fast
+            self.card_weights.setVisible(False)
+            self.btn_run.setText("Start Calculation in SMT Mode")
+            self.update_run_button_style(0)
+            
+            self.notify_color_change("#107C10")
+            
+        else:
+            # Prevent unchecking if it's the only one
+            if not self.cb_opt.isChecked():
+                self.cb_smt.blockSignals(True)
+                self.cb_smt.setChecked(True)
+                self.cb_smt.blockSignals(False)
 
-        if val == 0: 
-            color_hex = "#107C10" 
-            desc = "Fast (Single Solution)"
-        elif val == 1: 
-            color_hex = "#00629B"
-            desc = "Pro (All Valid Solutions)"
-        else: 
-            color_hex = "#FF8C00" 
-            desc = "Ultra (Cost Optimization)"
+    def on_opt_checked(self, state):
+        if state == Qt.CheckState.Checked.value: # Checked
+            self.cb_smt.blockSignals(True)
+            self.cb_smt.setChecked(False)
+            self.cb_smt.blockSignals(False)
+            
+            self.mode_index = 2 # Ultra
+            self.card_weights.setVisible(True)
+            self.btn_run.setText("Start Calculation in OPT Mode")
+            self.update_run_button_style(2)
+            
+            self.notify_color_change("#FF8C00")
+            
+        else:
+            if not self.cb_smt.isChecked():
+                self.cb_opt.blockSignals(True)
+                self.cb_opt.setChecked(True)
+                self.cb_opt.blockSignals(False)
 
-        self.lbl_opts_desc.setText(desc)
-        self.btn_run.setText(f"Start Calculation in {mode_text} Mode")
+    def update_run_button_style(self, mode_idx):
+        if mode_idx == 0: color_hex = "#107C10" # Green for SMT
+        else: color_hex = "#FF8C00" # Orange for OPT
         
         btn_style = f"""
             PrimaryPushButton {{
@@ -187,33 +305,55 @@ class HomePage(QWidget):
             }}
         """
         self.btn_run.setStyleSheet(btn_style)
-        
-        # [NEW] Notify Results Page about color change
+
+    def notify_color_change(self, color_hex):
         main_win = self.window()
         if isinstance(main_win, FluentWindow) and hasattr(main_win, 'results_page'):
             main_win.results_page.set_export_button_color(color_hex)
-        
-        slider_style = f"""
-            Slider::groove:horizontal {{
-                height: 4px; 
-                background: #cccccc;
-                border-radius: 2px;
-            }}
-            Slider::handle:horizontal {{
-                background: {color_hex};
-                border: 2px solid {color_hex};
-                width: 18px;
-                height: 18px;
-                border-radius: 10px;
-                margin: -7px 0;
-            }}
-            Slider::sub-page:horizontal {{
-                background: {color_hex};
-                border-radius: 2px;
-            }}
-        """
-        self.slider_mode.setStyleSheet(slider_style)
 
+    # -----------------------------------------------------
+    # Logic: Weights Balancing
+    # -----------------------------------------------------
+    def balance_weights(self, source_spin, new_val):
+        old_val = self.prev_vals[source_spin]
+        delta = new_val - old_val
+        self.prev_vals[source_spin] = new_val
+        
+        if abs(delta) < 0.0001: return
+        
+        others = [s for s in [self.spin_energy, self.spin_use, self.spin_co2] if s != source_spin]
+        for s in others: s.blockSignals(True)
+        
+        adjustment = delta / 2.0
+        for s in others:
+            curr = s.value()
+            s.setValue(max(0.0, min(1.0, curr - adjustment)))
+            self.prev_vals[s] = s.value()
+            
+        for s in others: s.blockSignals(False)
+
+    def get_weights(self):
+        return (self.spin_energy.value(), self.spin_use.value(), self.spin_co2.value())
+
+    # -----------------------------------------------------
+    # Logic: Export Path
+    # -----------------------------------------------------
+    def toggle_path_mode(self, checked):
+        self.btn_browse_path.setEnabled(checked)
+        if not checked:
+            self.line_path.setText(self.default_export_path)
+
+    def browse_path(self):
+        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", self.line_path.text())
+        if d:
+            self.line_path.setText(d)
+
+    def get_export_path(self):
+        return self.line_path.text()
+
+    # -----------------------------------------------------
+    # Logic: File Selection & Running
+    # -----------------------------------------------------
     def select_recipe(self):
         f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
         if f:
@@ -236,10 +376,9 @@ class HomePage(QWidget):
         self.btn_run.setEnabled(False)
         self.log_callback("Starting Process...")
         
-        mode = self.slider_mode.value()
-        weights = self.settings_page.get_weights()
+        weights = self.get_weights()
         
-        self.worker = SMTWorker(self.recipe_path, self.resource_dir, mode, weights)
+        self.worker = SMTWorker(self.recipe_path, self.resource_dir, self.mode_index, weights)
         self.worker.log_signal.connect(self.log_callback)
         self.worker.progress_signal.connect(lambda c, t: (self.pbar.setMaximum(t), self.pbar.setValue(c)))
         self.worker.error_signal.connect(lambda e: InfoBar.error(title="Error", content=e, parent=self.window()))
@@ -251,7 +390,6 @@ class HomePage(QWidget):
         main = self.window()
         if isinstance(main, FluentWindow):
             if hasattr(main, 'results_page') and hasattr(main, 'switchTo'):
-                # Pass both gui data and context data
                 main.results_page.set_data(results, context_data)
                 main.switchTo(main.results_page)
                 InfoBar.success(title="Completed", content=f"Calculation finished.", parent=main, position=InfoBarPosition.TOP_RIGHT)

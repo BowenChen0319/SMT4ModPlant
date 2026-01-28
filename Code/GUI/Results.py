@@ -110,8 +110,8 @@ class ResultsPage(QWidget):
         # Access settings via window().settings_page
         main_win = self.window()
         save_dir = ""
-        if hasattr(main_win, 'settings_page'):
-            save_dir = main_win.settings_page.get_export_path()
+        if hasattr(main_win, 'home_page'):
+            save_dir = main_win.home_page.get_export_path()
         else:
             save_dir = os.path.expanduser("~/Downloads")
             

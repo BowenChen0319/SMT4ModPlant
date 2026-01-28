@@ -28,7 +28,8 @@ try:
     from Code.GUI.Home import HomePage
     from Code.GUI.Results import ResultsPage
     from Code.GUI.Logs import LogPage
-    from Code.GUI.Settings import SettingsPage
+    # [删除] 不再需要导入 SettingsPage
+    # from Code.GUI.Settings import SettingsPage 
 except ImportError as e:
     print("Critical Import Error: Ensure 'Code/GUI' directory exists with all module files.")
     print(f"Error: {e}")
@@ -47,17 +48,21 @@ class MainWindow(FluentWindow):
             self.move(geo.width()//2 - self.width()//2, geo.height()//2 - self.height()//2)
         
         # Initialize Pages
-        # Settings needs to be created early so Home can reference it
-        self.settings_page = SettingsPage(self)
+        # [删除] self.settings_page = SettingsPage(self)
+        
         self.log_page = LogPage(self)
         self.results_page = ResultsPage(self)
-        self.home_page = HomePage(self.log_callback_shim, self.settings_page, self)
+        
+        # [修改] 这里的参数改了！不再传递 settings_page
+        self.home_page = HomePage(self.log_callback_shim, self)
         
         # Add Navigation
         self.addSubInterface(self.home_page, FluentIcon.HOME, "Home", NavigationItemPosition.TOP)
         self.addSubInterface(self.results_page, FluentIcon.ACCEPT, "Results", NavigationItemPosition.TOP)
         self.addSubInterface(self.log_page, FluentIcon.DOCUMENT, "Log", NavigationItemPosition.TOP)
-        self.addSubInterface(self.settings_page, FluentIcon.SETTING, "Settings", NavigationItemPosition.BOTTOM)
+        
+        # [删除] 移除设置页的入口
+        # self.addSubInterface(self.settings_page, FluentIcon.SETTING, "Settings", NavigationItemPosition.BOTTOM)
         
         self.switchTo(self.home_page)
 

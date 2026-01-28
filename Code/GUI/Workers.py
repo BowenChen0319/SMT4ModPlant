@@ -5,7 +5,6 @@ import traceback
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# 引入后端函数
 try:
     from Code.SMT4ModPlant.GeneralRecipeParser import parse_general_recipe
     from Code.SMT4ModPlant.AASxmlCapabilityParser import parse_capabilities_robust
