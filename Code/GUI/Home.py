@@ -1,6 +1,6 @@
 # Code/GUI/Home.py
 import os
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QProgressBar
 )
@@ -8,7 +8,7 @@ from qfluentwidgets import (
     CardWidget, IconWidget, BodyLabel, CaptionLabel, 
     PrimaryPushButton, PushButton, CheckBox,
     TitleLabel, SubtitleLabel, FluentIcon, InfoBar, InfoBarPosition, setThemeColor,
-    FluentWindow, SwitchButton, LineEdit, DoubleSpinBox, setTheme, Theme
+    FluentWindow, SwitchButton, DoubleSpinBox
 )
 
 from Code.GUI.Workers import SMTWorker
@@ -22,11 +22,18 @@ class HomePage(QWidget):
         # 初始化变量
         self.recipe_path = ""
         self.resource_dir = ""
-        self.default_export_path = os.path.expanduser("~/Downloads")
+        
+        # [修改] 使用 os.path.normpath 确保默认路径在不同系统(Win/Mac)下显示正确的斜杠
+        self.default_export_path = os.path.normpath(os.path.expanduser("~/Downloads"))
+        self.current_export_path = self.default_export_path
+        
         self.mode_index = 0 # 0=SMT(Fast), 2=OPT(Ultra)
         
         # 权重相关变量
         self.prev_vals = {}
+        
+        # 动画对象占位
+        self.anim = None
         
         setThemeColor("#00629B")
         
@@ -37,13 +44,11 @@ class HomePage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(15) 
 
-        # --- Header (Title Only) ---
-        # [修改] 移除了 Dark Mode 开关，只保留标题
+        # --- Header ---
         header_layout = QHBoxLayout()
         v_title = QVBoxLayout()
         title = TitleLabel("SMT4ModPlant Orchestrator", self)
         desc = CaptionLabel("Resource matching tool based on General Recipe and AAS Capabilities.", self)
-        # 在深色模式下，#666 可能稍暗，这里稍微调亮一点以保证可读性
         desc.setStyleSheet("color: #999;") 
         v_title.addWidget(title)
         v_title.addWidget(desc)
@@ -57,14 +62,18 @@ class HomePage(QWidget):
         # =================================================
         self.card_recipe = CardWidget(self)
         l1 = QHBoxLayout(self.card_recipe)
+        l1.setContentsMargins(20, 20, 20, 20) 
+        
         icon1 = IconWidget(FluentIcon.DOCUMENT, self)
         v1 = QVBoxLayout()
-        self.lbl_recipe = BodyLabel("General Recipe XML", self)
+        self.lbl_recipe = SubtitleLabel("General Recipe XML", self)
         self.lbl_recipe_val = CaptionLabel("No file selected", self)
         v1.addWidget(self.lbl_recipe)
         v1.addWidget(self.lbl_recipe_val)
+        
         btn1 = PushButton("Select File", self)
         btn1.clicked.connect(self.select_recipe)
+        
         l1.addWidget(icon1)
         l1.addLayout(v1, 1)
         l1.addWidget(btn1)
@@ -75,63 +84,76 @@ class HomePage(QWidget):
         # =================================================
         self.card_res = CardWidget(self)
         l2 = QHBoxLayout(self.card_res)
+        l2.setContentsMargins(20, 20, 20, 20)
+        
         icon2 = IconWidget(FluentIcon.FOLDER, self)
         v2 = QVBoxLayout()
-        self.lbl_res = BodyLabel("Resources Directory (XML/AASX)", self)
+        self.lbl_res = SubtitleLabel("Resources Directory (XML/AASX)", self)
         self.lbl_res_val = CaptionLabel("No folder selected", self)
         v2.addWidget(self.lbl_res)
         v2.addWidget(self.lbl_res_val)
+        
         btn2 = PushButton("Select Folder", self)
         btn2.clicked.connect(self.select_folder)
+        
         l2.addWidget(icon2)
         l2.addLayout(v2, 1)
         l2.addWidget(btn2)
         layout.addWidget(self.card_res)
 
         # =================================================
-        # 3. Export Directory
+        # 3. Export Directory (UI Completely Redesigned)
         # =================================================
         self.card_export = CardWidget(self)
-        l_export = QVBoxLayout(self.card_export)
-        l_export.setContentsMargins(20, 15, 20, 15)
-        l_export.setSpacing(10)
-
-        # Header Line: Icon + Title + Switch
-        exp_header = QHBoxLayout()
-        exp_header.setContentsMargins(0,0,0,0)
+        # 使用 QHBoxLayout 保持和其他卡片一致的左右结构
+        l_export = QHBoxLayout(self.card_export)
+        l_export.setContentsMargins(20, 20, 20, 20)
+        
         icon_exp = IconWidget(FluentIcon.SAVE, self)
+        
+        # 中间部分：标题 + 路径文本 (CaptionLabel)
+        # 这实现了"文本框展示的方式换成和上面两个一样"
+        v_exp_text = QVBoxLayout()
         lbl_exp_title = SubtitleLabel("Export Directory", self)
+        self.lbl_exp_path = CaptionLabel(self.default_export_path, self)
+        # 设置自动换行，防止路径太长撑破布局
+        self.lbl_exp_path.setWordWrap(False) 
+        v_exp_text.addWidget(lbl_exp_title)
+        v_exp_text.addWidget(self.lbl_exp_path)
         
+        # 右侧部分：文字 + 开关 + 按钮
+        # 使用弹簧把它们推到最右边
+        
+        # 这个 Label 显示 "Default (Downloads)" 或 "Custom"
+        # 放在开关左边，实现“开关在文字右边”
+        self.lbl_switch_status = BodyLabel("Default (Downloads)", self)
+        self.lbl_switch_status.setStyleSheet("color: #666;") # 稍微灰色一点，区分度更好
+
         self.switch_custom_path = SwitchButton(self)
-        self.switch_custom_path.setOnText("Custom")
-        self.switch_custom_path.setOffText("Default (Downloads)")
+        # 我们手动控制文字标签，所以这里就不设置 OnText/OffText 了，或者设为空
+        self.switch_custom_path.setOnText("")
+        self.switch_custom_path.setOffText("")
         self.switch_custom_path.checkedChanged.connect(self.toggle_path_mode)
-        
-        exp_header.addWidget(icon_exp)
-        exp_header.addWidget(lbl_exp_title)
-        exp_header.addStretch(1)
-        exp_header.addWidget(self.switch_custom_path)
-        
-        # Path Line: LineEdit + Browse Button
-        exp_selection = QHBoxLayout()
-        exp_selection.setContentsMargins(0,0,0,0)
-        self.line_path = LineEdit(self)
-        self.line_path.setReadOnly(True)
-        self.line_path.setText(self.default_export_path)
         
         self.btn_browse_path = PushButton("Browse", self)
         self.btn_browse_path.clicked.connect(self.browse_path)
-        self.btn_browse_path.setEnabled(False) 
+        self.btn_browse_path.setEnabled(False) # 默认禁用
         
-        exp_selection.addWidget(self.line_path)
-        exp_selection.addWidget(self.btn_browse_path)
+        # 组装 Export 卡片布局
+        l_export.addWidget(icon_exp)
+        l_export.addLayout(v_exp_text, 1) # 给路径文字分配更多空间
         
-        l_export.addLayout(exp_header)
-        l_export.addLayout(exp_selection)
+        l_export.addStretch(0) # 这是一个小的弹簧，或者是固定间距
+        l_export.addWidget(self.lbl_switch_status) # 文字
+        l_export.addSpacing(10)
+        l_export.addWidget(self.switch_custom_path) # 开关 (在文字右边)
+        l_export.addSpacing(20)
+        l_export.addWidget(self.btn_browse_path) # 按钮
+        
         layout.addWidget(self.card_export)
 
         # =================================================
-        # 4. Optimization Mode (SMT vs OPT)
+        # 4. Optimization Mode
         # =================================================
         self.card_mode = CardWidget(self)
         l_mode = QHBoxLayout(self.card_mode)
@@ -140,15 +162,12 @@ class HomePage(QWidget):
         icon_mode = IconWidget(FluentIcon.SPEED_HIGH, self)
         lbl_mode = SubtitleLabel("Optimization Mode", self)
         
-        # Checkboxes acting like Radio Buttons
         self.cb_smt = CheckBox("SMT (Fast)", self)
         self.cb_opt = CheckBox("OPT (Ultra)", self)
         
-        # 默认选中 SMT
         self.cb_smt.setChecked(True)
         self.cb_opt.setChecked(False)
         
-        # 连接信号
         self.cb_smt.stateChanged.connect(self.on_smt_checked)
         self.cb_opt.stateChanged.connect(self.on_opt_checked)
         
@@ -162,7 +181,7 @@ class HomePage(QWidget):
         layout.addWidget(self.card_mode)
 
         # =================================================
-        # 5. Optimization Weights (Initially Hidden)
+        # 5. Optimization Weights (Animation Supported)
         # =================================================
         self.card_weights = CardWidget(self)
         l_weights = QVBoxLayout(self.card_weights)
@@ -207,12 +226,13 @@ class HomePage(QWidget):
             self.spin_co2: 0.3
         }
         
-        # Connect signals for balancing
+        # Connect signals
         self.spin_energy.valueChanged.connect(lambda v: self.balance_weights(self.spin_energy, v))
         self.spin_use.valueChanged.connect(lambda v: self.balance_weights(self.spin_use, v))
         self.spin_co2.valueChanged.connect(lambda v: self.balance_weights(self.spin_co2, v))
         
-        # 默认隐藏权重设置 (因为默认是 SMT 模式)
+        # Default hidden with height 0
+        self.card_weights.setMaximumHeight(0)
         self.card_weights.setVisible(False)
 
         # =================================================
@@ -229,45 +249,67 @@ class HomePage(QWidget):
         
         layout.addStretch()
         
-        # 初始化 UI 状态颜色
         self.update_run_button_style(0)
 
     # -----------------------------------------------------
-    # Logic: Mode Selection (SMT vs OPT)
+    # Animation Logic
+    # -----------------------------------------------------
+    def toggle_weights_animation(self, show):
+        if show and self.card_weights.isVisible() and self.card_weights.maximumHeight() > 0:
+            return
+        if not show and not self.card_weights.isVisible():
+            return
+
+        self.card_weights.setMaximumHeight(16777215) 
+        self.card_weights.adjustSize()
+        target_height = self.card_weights.sizeHint().height()
+
+        self.anim = QPropertyAnimation(self.card_weights, b"maximumHeight")
+        self.anim.setDuration(300) 
+        self.anim.setEasingCurve(QEasingCurve.Type.OutCubic) 
+
+        if show:
+            self.card_weights.setVisible(True)
+            self.anim.setStartValue(0)
+            self.anim.setEndValue(target_height)
+        else:
+            self.anim.setStartValue(target_height)
+            self.anim.setEndValue(0)
+            self.anim.finished.connect(lambda: self.card_weights.setVisible(False))
+
+        self.anim.start()
+
+    # -----------------------------------------------------
+    # Logic: Mode Selection
     # -----------------------------------------------------
     def on_smt_checked(self, state):
-        if state == Qt.CheckState.Checked.value: # Checked
+        if state == Qt.CheckState.Checked.value: 
             self.cb_opt.blockSignals(True)
             self.cb_opt.setChecked(False)
             self.cb_opt.blockSignals(False)
             
             self.mode_index = 0 # Fast
-            self.card_weights.setVisible(False)
+            self.toggle_weights_animation(False)
             self.btn_run.setText("Start Calculation in SMT Mode")
             self.update_run_button_style(0)
-            
             self.notify_color_change("#107C10")
-            
         else:
-            # Prevent unchecking if it's the only one
             if not self.cb_opt.isChecked():
                 self.cb_smt.blockSignals(True)
                 self.cb_smt.setChecked(True)
                 self.cb_smt.blockSignals(False)
 
     def on_opt_checked(self, state):
-        if state == Qt.CheckState.Checked.value: # Checked
+        if state == Qt.CheckState.Checked.value: 
             self.cb_smt.blockSignals(True)
             self.cb_smt.setChecked(False)
             self.cb_smt.blockSignals(False)
             
             self.mode_index = 2 # Ultra
-            self.card_weights.setVisible(True)
+            self.toggle_weights_animation(True)
             self.btn_run.setText("Start Calculation in OPT Mode")
             self.update_run_button_style(2)
-            
             self.notify_color_change("#FF8C00")
-            
         else:
             if not self.cb_smt.isChecked():
                 self.cb_opt.blockSignals(True)
@@ -275,8 +317,8 @@ class HomePage(QWidget):
                 self.cb_opt.blockSignals(False)
 
     def update_run_button_style(self, mode_idx):
-        if mode_idx == 0: color_hex = "#107C10" # Green for SMT
-        else: color_hex = "#FF8C00" # Orange for OPT
+        if mode_idx == 0: color_hex = "#107C10" 
+        else: color_hex = "#FF8C00" 
         
         btn_style = f"""
             PrimaryPushButton {{
@@ -340,16 +382,32 @@ class HomePage(QWidget):
     # -----------------------------------------------------
     def toggle_path_mode(self, checked):
         self.btn_browse_path.setEnabled(checked)
-        if not checked:
-            self.line_path.setText(self.default_export_path)
+        if checked:
+            # Custom Mode
+            self.lbl_switch_status.setText("Custom Path")
+            # 保持之前选择的路径，或者如果是默认路径，则允许用户修改
+            if self.current_export_path == self.default_export_path:
+                 # 如果当前是默认路径，切换时可以保持，也可以置空，这里选择保持显示
+                 pass
+        else:
+            # Default Mode
+            self.lbl_switch_status.setText("Default (Downloads)")
+            # 恢复默认路径显示
+            self.current_export_path = self.default_export_path
+            self.lbl_exp_path.setText(self.current_export_path)
 
     def browse_path(self):
-        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", self.line_path.text())
+        # 使用 os.path.normpath 处理初始路径
+        start_dir = self.current_export_path if os.path.exists(self.current_export_path) else os.getcwd()
+        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", start_dir)
         if d:
-            self.line_path.setText(d)
+            # [关键] 规范化路径显示 (处理 / 和 \)
+            norm_d = os.path.normpath(d)
+            self.current_export_path = norm_d
+            self.lbl_exp_path.setText(norm_d)
 
     def get_export_path(self):
-        return self.line_path.text()
+        return self.lbl_exp_path.text()
 
     # -----------------------------------------------------
     # Logic: File Selection & Running
@@ -357,15 +415,15 @@ class HomePage(QWidget):
     def select_recipe(self):
         f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
         if f:
-            self.recipe_path = f
-            self.lbl_recipe_val.setText(os.path.basename(f))
+            self.recipe_path = os.path.normpath(f)
+            self.lbl_recipe_val.setText(os.path.basename(self.recipe_path))
             self.check_ready()
 
     def select_folder(self):
         d = QFileDialog.getExistingDirectory(self, "Select Resources Folder", os.getcwd())
         if d:
-            self.resource_dir = d
-            self.lbl_res_val.setText(d)
+            self.resource_dir = os.path.normpath(d)
+            self.lbl_res_val.setText(self.resource_dir)
             self.check_ready()
 
     def check_ready(self):
