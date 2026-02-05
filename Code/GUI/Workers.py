@@ -32,12 +32,14 @@ class SMTWorker(QThread):
     def run(self):
         """Execute the end-to-end workflow: parse inputs, solve SMT, optionally rank solutions."""
         try:
+            current_phase = "Recipe"
             # 1. Parsing
             self.log_signal.emit(f"Parsing Recipe: {self.recipe_path}")
             recipe_data = parse_general_recipe(self.recipe_path)
             self.progress_signal.emit(10, 100)
 
             # Build list of supported resource files up front to fail fast if empty
+            current_phase = "AAS"
             self.log_signal.emit(f"Scanning resource directory: {self.resource_dir}")
             resource_files = [
                 f for f in os.listdir(self.resource_dir)
@@ -61,6 +63,7 @@ class SMTWorker(QThread):
                         key_name = f"resource: {res_name}" 
                         all_capabilities[key_name] = caps
                 except Exception as parse_err:
+                    # Keep running but warn; a hard failure will be caught later
                     self.log_signal.emit(f"Warning: Failed to parse {filename}: {parse_err}")
 
                 progress = 10 + int((idx + 1) / total_files * 20)
@@ -70,6 +73,7 @@ class SMTWorker(QThread):
             if not all_capabilities: raise ValueError("No valid resources loaded.")
 
             # 2. SMT Logic Configuration
+            current_phase = "Calculation"
             find_all = True  # SMT lists every solution; OPT also needs the full set before ranking
             is_opt = (self.mode_index == 1)
             
@@ -136,5 +140,13 @@ class SMTWorker(QThread):
             self.finished_signal.emit(gui_results, context_data)
 
         except Exception as e:
-            self.error_signal.emit(str(e))
+            # Map technical errors to user-friendly phases
+            phase = locals().get("current_phase", "Calculation")
+            if phase == "Recipe":
+                user_msg = "General Recipe read error"
+            elif phase == "AAS":
+                user_msg = "AAS file read error"
+            else:
+                user_msg = "Calculation error"
+            self.error_signal.emit(user_msg)
             self.log_signal.emit(traceback.format_exc())

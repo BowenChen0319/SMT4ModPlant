@@ -22,7 +22,7 @@ class MainWindow(FluentWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
+        self.setWindowTitle("Plant Configurator and Master Recipe Generator")
         setTheme(Theme.DARK)
         self.resize(1200, 800) # Initial window size
         

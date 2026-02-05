@@ -76,7 +76,7 @@ class HomePage(QWidget):
         # Header
         header_layout = QHBoxLayout()
         v_title = QVBoxLayout()
-        title = TitleLabel("SMT4ModPlant Orchestrator", self)
+        title = TitleLabel("Plant Configurator and Master Recipe Generator", self)
         desc = CaptionLabel("Resource matching tool based on General Recipe and AAS Capabilities.", self)
         desc.setStyleSheet("color: #999;") 
         v_title.addWidget(title)
