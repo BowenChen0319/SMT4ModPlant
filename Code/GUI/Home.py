@@ -153,9 +153,9 @@ class HomePage(QWidget):
         l_mode = QHBoxLayout(self.card_mode)
         l_mode.setContentsMargins(20, 20, 20, 20)
         icon_mode = IconWidget(FluentIcon.SPEED_HIGH, self)
-        lbl_mode = SubtitleLabel("Optimization Mode", self)
-        self.cb_smt = CheckBox("SMT (One Solution)", self)
-        self.cb_opt = CheckBox("OPT (Best One from Multi-Solution)", self)
+        lbl_mode = SubtitleLabel("Solution Type", self)
+        self.cb_smt = CheckBox("SMT (Get All Solution)", self)
+        self.cb_opt = CheckBox("OPT (Get Best One from Multi-Solution)", self)
         self.cb_smt.setChecked(True)
         self.cb_opt.setChecked(False)
         self.cb_smt.stateChanged.connect(self.on_smt_checked)
@@ -238,14 +238,10 @@ class HomePage(QWidget):
 
         # 2. [New] Resize Window Logic
         if show:
-            # 获取当前窗口
             win = self.window()
             if win:
                 current_h = win.height()
-                # 增加的高度 = 卡片高度 + 间距(Spacing)
-                # 这里的 15 是 layout spacing，给一点余量
                 new_h = current_h + target_height + 20 
-                # 限制不要超过屏幕高度太多 (可选)
                 screen = QApplication.primaryScreen().availableGeometry()
                 if new_h < screen.height():
                     win.resize(win.width(), new_h)
@@ -312,10 +308,10 @@ class HomePage(QWidget):
             self.cb_smt.blockSignals(True)
             self.cb_smt.setChecked(False)
             self.cb_smt.blockSignals(False)
-            self.mode_index = 2
+            self.mode_index = 1
             self.toggle_weights_animation(True)
             self.btn_run.setText("Start Calculation in OPT Mode")
-            self.update_run_button_style(2)
+            self.update_run_button_style(1)
             self.notify_color_change("#FF8C00")
         else:
             if not self.cb_smt.isChecked(): self.cb_opt.setChecked(True)

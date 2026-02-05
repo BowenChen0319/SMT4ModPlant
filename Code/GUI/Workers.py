@@ -25,7 +25,7 @@ class SMTWorker(QThread):
         super().__init__()
         self.recipe_path = recipe_path
         self.resource_dir = resource_dir
-        self.mode_index = mode_index # 0:Fast, 1:Pro, 2:Ultra
+        self.mode_index = mode_index # 0:SMT(all solutions), 1:OPT(best from multi)
         self.weights = weights 
 
     def run(self):
@@ -64,10 +64,10 @@ class SMTWorker(QThread):
             if not all_capabilities: raise ValueError("No valid resources loaded.")
 
             # 2. SMT Logic Configuration
-            find_all = (self.mode_index >= 1) # Pro or Ultra
-            is_ultra = (self.mode_index == 2)
+            find_all = True  # SMT gets all solutions; OPT also needs all before ranking
+            is_opt = (self.mode_index == 1)
             
-            mode_names = ['Fast', 'Pro', 'Ultra']
+            mode_names = ['SMT (All Solutions)', 'OPT (Best from Multi)']
             self.log_signal.emit(f"Starting SMT Logic (Mode: {mode_names[self.mode_index]})...")
             
             # SMT run
@@ -88,9 +88,9 @@ class SMTWorker(QThread):
             
             self.progress_signal.emit(60, 100)
 
-            # 3. Ultra Optimization Logic
-            if is_ultra and json_solutions:
-                self.log_signal.emit("Ultra Mode: Calculating costs and finding optimal solution...")
+            # 3. OPT Logic: rank all solutions and keep best; SMT just shows all raw solutions
+            if is_opt and json_solutions:
+                self.log_signal.emit("OPT Mode: Calculating costs and selecting best solution...")
                 
                 optimizer = SolutionOptimizer()
                 optimizer.set_weights(*self.weights)
@@ -100,10 +100,11 @@ class SMTWorker(QThread):
                 
                 sorted_gui_results = []
                 
-                for eval_sol in evaluated_solutions:
+                for idx, eval_sol in enumerate(evaluated_solutions):
                     sol_id = eval_sol['solution_id']
                     rows = [r for r in gui_results if r.get('solution_id') == sol_id]
-                    if sorted_gui_results: sorted_gui_results.append({})
+                    if sorted_gui_results and rows:
+                        sorted_gui_results.append({})  # spacer between solutions
                     
                     for row in rows:
                         row['composite_score'] = eval_sol['composite_score']

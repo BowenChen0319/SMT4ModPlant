@@ -38,9 +38,7 @@ class ResultsWidget(QWidget):
         self.table.setBorderVisible(True)
         self.table.setWordWrap(True)
         
-        # [修改] 禁止单选行高亮，因为我们现在用 Checkbox
         self.table.setSelectionMode(TableWidget.SelectionMode.NoSelection)
-        # [新增] 监听 Item 变化 (用于检测 Checkbox 状态)
         self.table.itemChanged.connect(self.on_item_changed)
         
         layout.addLayout(header_layout)
@@ -95,12 +93,10 @@ class ResultsWidget(QWidget):
                 self.btn_export.setText("Export Selected")
 
     def export_solution(self):
-        # 1. 收集所有被选中的 Solution ID
         selected_sol_ids = set()
         for r in range(self.table.rowCount()):
             chk_item = self.table.item(r, 0)
             if chk_item and chk_item.checkState() == Qt.CheckState.Checked:
-                # 获取同一行的 Sol ID (现在是第2列，索引1)
                 sol_id_item = self.table.item(r, 1)
                 if sol_id_item and sol_id_item.text().isdigit():
                     selected_sol_ids.add(int(sol_id_item.text()))
@@ -119,7 +115,7 @@ class ResultsWidget(QWidget):
         if not save_dir or not os.path.exists(save_dir):
             save_dir = os.path.expanduser("~/Downloads")
 
-        # 3. 循环导出
+        # 3. Generate Files
         success_count = 0
         try:
             for sol_id in selected_sol_ids:
@@ -158,7 +154,7 @@ class ResultsWidget(QWidget):
             )
 
     def update_table(self, data: List[Dict]):
-        # 判断是否有 Score
+        # Determine if 'composite_score' exists in data
         has_score = False
         if data and len(data) > 0:
             for row in data:
@@ -166,7 +162,7 @@ class ResultsWidget(QWidget):
                     has_score = True
                     break
         
-        # [修改] 增加 "Export" 列在最前面
+        # Set up headers based on presence of score
         if has_score:
             headers = ["Export", "Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
             col_count = 10
@@ -177,19 +173,18 @@ class ResultsWidget(QWidget):
         self.table.setColumnCount(col_count)
         self.table.setHorizontalHeaderLabels(headers)
         
-        # 调整列宽
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        # Capabilities 列自适应拉伸
+
         cap_col_idx = 6 if has_score else 5
         self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.Stretch)
 
         self.table.setRowCount(len(data))
-        self.table.blockSignals(True) # 暂时屏蔽信号，提高填充速度
+        self.table.blockSignals(True) # Prevent signals during setup
 
         last_sol_id = -1
 
         for r, row_data in enumerate(data):
-            # 处理空行 (分隔符)
+ 
             if not row_data:
                 for c in range(col_count):
                     item = QTableWidgetItem("")
@@ -201,18 +196,18 @@ class ResultsWidget(QWidget):
 
             # Col 0: Checkbox
             chk_item = QTableWidgetItem()
-            # 只有当这是该 Solution 的第一行时，才显示 Checkbox
+
             if current_sol_id != last_sol_id and current_sol_id != -1:
                 chk_item.setCheckState(Qt.CheckState.Unchecked)
                 chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
                 last_sol_id = current_sol_id
             else:
-                # 其他行放空的，不可选
+
                 chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
             
             self.table.setItem(r, 0, chk_item)
 
-            # 填充其他数据 (注意列索引全部 +1)
+
             if has_score:
                 self.table.setItem(r, 1, QTableWidgetItem(str(row_data.get('solution_id', ''))))
                 self.table.setItem(r, 2, QTableWidgetItem(f"{row_data.get('composite_score', 0):.2f}"))

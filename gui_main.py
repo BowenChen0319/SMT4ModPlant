@@ -12,7 +12,6 @@ from qfluentwidgets import (
 
 try:
     from Code.GUI.Home import HomePage
-    # from Code.GUI.Results import ResultsPage  <-- [删除]
     from Code.GUI.Logs import LogPage
 except ImportError as e:
     print(f"Error: {e}")
@@ -23,7 +22,7 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
         setTheme(Theme.DARK)
-        self.resize(1200, 800) # [建议] 稍微加宽一点，因为是分屏显示
+        self.resize(1200, 800) # Initial window size
         
         screen = QApplication.primaryScreen()
         if screen:
@@ -31,7 +30,6 @@ class MainWindow(FluentWindow):
             self.move(geo.width()//2 - self.width()//2, geo.height()//2 - self.height()//2)
         
         self.log_page = LogPage(self)
-        # self.results_page = ResultsPage(self) <-- [删除]
         
         self.home_page = HomePage(self.log_callback_shim, self)
         
