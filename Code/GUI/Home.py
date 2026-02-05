@@ -372,7 +372,8 @@ class HomePage(QWidget):
     def browse_path(self):
         """Open a directory chooser for the export location."""
         start_dir = self.current_export_path if os.path.exists(self.current_export_path) else os.getcwd()
-        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", start_dir)
+        options = QFileDialog.Option.DontUseNativeDialog
+        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", start_dir, options=options)
         if d:
             norm_d = os.path.normpath(d)
             self.current_export_path = norm_d
@@ -384,7 +385,8 @@ class HomePage(QWidget):
 
     def select_recipe(self):
         """Prompt for a General Recipe XML file and update state."""
-        f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
+        options = QFileDialog.Option.DontUseNativeDialog
+        f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)", options=options)
         if f:
             self.recipe_path = os.path.normpath(f)
             self.lbl_recipe_val.setText(os.path.basename(self.recipe_path))
@@ -392,7 +394,8 @@ class HomePage(QWidget):
 
     def select_folder(self):
         """Prompt for the resources directory and update state."""
-        d = QFileDialog.getExistingDirectory(self, "Select Resources Folder", os.getcwd())
+        options = QFileDialog.Option.DontUseNativeDialog
+        d = QFileDialog.getExistingDirectory(self, "Select Resources Folder", os.getcwd(), options=options)
         if d:
             self.resource_dir = os.path.normpath(d)
             self.lbl_res_val.setText(self.resource_dir)
