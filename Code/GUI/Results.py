@@ -113,7 +113,8 @@ class ResultsWidget(QWidget):
             p = p.parent()
         
         if not save_dir or not os.path.exists(save_dir):
-            save_dir = os.path.expanduser("~/Downloads")
+            # Normalize to platform separators (handles Windows vs. Unix)
+            save_dir = os.path.normpath(os.path.expanduser("~/Downloads"))
 
         # 3. Generate Files
         success_count = 0
