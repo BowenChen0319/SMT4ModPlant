@@ -18,6 +18,8 @@ except ImportError as e:
     sys.exit(1)
 
 class MainWindow(FluentWindow):
+    """Top-level window hosting navigation, the Home page, and log view."""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SMT4ModPlant GUI Orchestrator")
@@ -41,6 +43,7 @@ class MainWindow(FluentWindow):
         self.switchTo(self.home_page)
 
     def log_callback_shim(self, msg):
+        """Bridge the worker log signal into the log page widget."""
         self.log_page.append_log(msg)
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ except ImportError as e:
     print(f"Specific Error: {e}")
 
 class SMTWorker(QThread):
+    """Background thread that handles parsing inputs, running SMT, and optional optimization."""
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int, int)
     # [MODIFIED] Signal now carries (gui_data_list, context_dict)
@@ -29,14 +30,19 @@ class SMTWorker(QThread):
         self.weights = weights 
 
     def run(self):
+        """Execute the end-to-end workflow: parse inputs, solve SMT, optionally rank solutions."""
         try:
             # 1. Parsing
             self.log_signal.emit(f"Parsing Recipe: {self.recipe_path}")
             recipe_data = parse_general_recipe(self.recipe_path)
             self.progress_signal.emit(10, 100)
 
+            # Build list of supported resource files up front to fail fast if empty
             self.log_signal.emit(f"Scanning resource directory: {self.resource_dir}")
-            resource_files = [f for f in os.listdir(self.resource_dir) if f.lower().endswith('.xml') or f.lower().endswith('.aasx')]
+            resource_files = [
+                f for f in os.listdir(self.resource_dir)
+                if f.lower().endswith(('.xml', '.aasx', '.json'))
+            ]
             
             if not resource_files:
                 raise FileNotFoundError("No .xml or .aasx files found in the selected directory.")
@@ -64,7 +70,7 @@ class SMTWorker(QThread):
             if not all_capabilities: raise ValueError("No valid resources loaded.")
 
             # 2. SMT Logic Configuration
-            find_all = True  # SMT gets all solutions; OPT also needs all before ranking
+            find_all = True  # SMT lists every solution; OPT also needs the full set before ranking
             is_opt = (self.mode_index == 1)
             
             mode_names = ['SMT (All Solutions)', 'OPT (Best from Multi)']

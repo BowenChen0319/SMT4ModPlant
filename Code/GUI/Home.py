@@ -17,6 +17,7 @@ from Code.GUI.Results import ResultsWidget
 class HomePage(QWidget):
     def __init__(self, log_callback, parent=None):
         super().__init__(parent)
+        """Main landing page that gathers user input and triggers SMT/OPT runs."""
         self.setObjectName("home_page")
         self.log_callback = log_callback
         
@@ -35,6 +36,7 @@ class HomePage(QWidget):
         self.init_ui()
         
     def init_ui(self):
+        """Build the overall two-panel layout and wire initial UI components."""
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
@@ -68,6 +70,7 @@ class HomePage(QWidget):
         self.main_layout.addWidget(self.right_container, 0)
 
     def _init_left_panel_content(self):
+        """Create the configuration cards on the left side (file pickers, mode, weights)."""
         layout = self.left_layout
         
         # Header
@@ -105,7 +108,7 @@ class HomePage(QWidget):
         l2.setContentsMargins(20, 20, 20, 20)
         icon2 = IconWidget(FluentIcon.FOLDER, self)
         v2 = QVBoxLayout()
-        self.lbl_res = SubtitleLabel("Resources Directory (XML/AASX)", self)
+        self.lbl_res = SubtitleLabel("Resources Directory (XML/AASX/JSON)", self)
         self.lbl_res_val = CaptionLabel("No folder selected", self)
         v2.addWidget(self.lbl_res)
         v2.addWidget(self.lbl_res_val)
@@ -226,7 +229,10 @@ class HomePage(QWidget):
     # -----------------------------------------------------
     def toggle_weights_animation(self, show):
         """
-        Animate visibility AND resize window if expanding
+        Animate the weights card and resize the window only when showing it.
+
+        Args:
+            show: True to expand the weights card; False to collapse.
         """
         if show and self.card_weights.isVisible() and self.card_weights.maximumHeight() > 0: return
         if not show and not self.card_weights.isVisible(): return
@@ -261,6 +267,7 @@ class HomePage(QWidget):
         self.anim.start()
 
     def toggle_results_panel(self, show=True):
+        """Slide the results panel open/closed by animating its width."""
         parent_width = self.width()
         target_width = parent_width // 2 if show else 0
         start_width = self.right_container.width()
@@ -291,6 +298,7 @@ class HomePage(QWidget):
     # Logic: Mode Selection
     # -----------------------------------------------------
     def on_smt_checked(self, state):
+        """Keep SMT checkbox mutually exclusive and update UI for SMT mode."""
         if state == Qt.CheckState.Checked.value: 
             self.cb_opt.blockSignals(True)
             self.cb_opt.setChecked(False)
@@ -304,6 +312,7 @@ class HomePage(QWidget):
             if not self.cb_opt.isChecked(): self.cb_smt.setChecked(True)
 
     def on_opt_checked(self, state):
+        """Keep OPT checkbox mutually exclusive and update UI for OPT mode."""
         if state == Qt.CheckState.Checked.value: 
             self.cb_smt.blockSignals(True)
             self.cb_smt.setChecked(False)
@@ -317,6 +326,7 @@ class HomePage(QWidget):
             if not self.cb_smt.isChecked(): self.cb_opt.setChecked(True)
 
     def update_run_button_style(self, mode_idx):
+        """Apply consistent theming to the primary run button based on mode."""
         color_hex = "#107C10" if mode_idx == 0 else "#FF8C00"
         btn_style = f"""
             PrimaryPushButton {{ background-color: {color_hex}; border: 1px solid {color_hex}; border-radius: 6px; color: white; height: 40px; font-size: 16px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }}
@@ -327,9 +337,11 @@ class HomePage(QWidget):
         self.btn_run.setStyleSheet(btn_style)
 
     def notify_color_change(self, color_hex):
+        """Propagate accent color changes to the results export button."""
         self.results_widget.set_export_button_color(color_hex)
 
     def balance_weights(self, source_spin, new_val):
+        """Adjust the other two weights evenly so the sum remains 1.0."""
         old_val = self.prev_vals[source_spin]
         delta = new_val - old_val
         self.prev_vals[source_spin] = new_val
@@ -344,9 +356,11 @@ class HomePage(QWidget):
         for s in others: s.blockSignals(False)
 
     def get_weights(self):
+        """Return the tuple of (energy, use, CO2) weights."""
         return (self.spin_energy.value(), self.spin_use.value(), self.spin_co2.value())
 
     def toggle_path_mode(self, checked):
+        """Enable/disable custom export path selection."""
         self.btn_browse_path.setEnabled(checked)
         if checked:
             self.lbl_switch_status.setText("Custom Path")
@@ -356,6 +370,7 @@ class HomePage(QWidget):
             self.lbl_exp_path.setText(self.current_export_path)
 
     def browse_path(self):
+        """Open a directory chooser for the export location."""
         start_dir = self.current_export_path if os.path.exists(self.current_export_path) else os.getcwd()
         d = QFileDialog.getExistingDirectory(self, "Select Export Directory", start_dir)
         if d:
@@ -364,9 +379,11 @@ class HomePage(QWidget):
             self.lbl_exp_path.setText(norm_d)
 
     def get_export_path(self):
+        """Return the currently selected export directory."""
         return self.lbl_exp_path.text()
 
     def select_recipe(self):
+        """Prompt for a General Recipe XML file and update state."""
         f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)")
         if f:
             self.recipe_path = os.path.normpath(f)
@@ -374,6 +391,7 @@ class HomePage(QWidget):
             self.check_ready()
 
     def select_folder(self):
+        """Prompt for the resources directory and update state."""
         d = QFileDialog.getExistingDirectory(self, "Select Resources Folder", os.getcwd())
         if d:
             self.resource_dir = os.path.normpath(d)
@@ -381,10 +399,12 @@ class HomePage(QWidget):
             self.check_ready()
 
     def check_ready(self):
+        """Enable Run only when both recipe and resources are selected."""
         if self.recipe_path and self.resource_dir:
             self.btn_run.setEnabled(True)
 
     def run_process(self):
+        """Instantiate the worker thread and kick off SMT/OPT processing."""
         self.btn_run.setEnabled(False)
         self.log_callback("Starting Process...")
         weights = self.get_weights()
@@ -396,6 +416,7 @@ class HomePage(QWidget):
         self.worker.start()
 
     def on_finished(self, results, context_data):
+        """Handle successful completion: re-enable UI, notify, and show results."""
         self.btn_run.setEnabled(True)
         InfoBar.success(title="Completed", content=f"Calculation finished.", parent=self, position=InfoBarPosition.TOP_RIGHT)
         self.results_widget.set_data(results, context_data)
@@ -411,6 +432,7 @@ class HomePage(QWidget):
         InfoBar.error(title="Error", content=err_msg, parent=self, position=InfoBarPosition.TOP_RIGHT)
 
     def resizeEvent(self, event):
+        """Keep the split layout responsive when the window size changes."""
         if self.right_container.width() > 0:
              self.right_container.setFixedWidth(self.width() // 2)
         super().resizeEvent(event)

@@ -2,20 +2,49 @@ import xml.etree.ElementTree as ET
 import json
 import zipfile
 import os
+import io
 from pathlib import Path
 
 def parse_capabilities_robust(file_path):
     """
-    Parses an AAS file (XML or AASX format) and extracts capabilities.
+    Parse an AAS file (XML, AASX, or JSON via basyx) and extract capabilities.
+    JSON inputs are converted to XML in memory so the downstream parser can stay unchanged.
+
+    Args:
+        file_path: Path to an AAS file (.xml, .aasx, or .json).
+
+    Returns:
+        List of capability dictionaries compatible with the SMT pipeline.
     """
     
     tree = None
     file_path_str = str(file_path)
     
     # -------------------------------------------------------
+    # Handle JSON with basyx (converted to XML in-memory)
+    # -------------------------------------------------------
+    if file_path_str.lower().endswith('.json'):
+        try:
+            from basyx.aas.adapter.json import read_aas_json_file
+            from basyx.aas.adapter.xml import write_aas_xml_file
+        except ImportError:
+            print("Error: basyx-python-sdk is required to read JSON AAS files. Please install it via pip.")
+            return []
+        try:
+            # Load AAS structures from JSON then emit equivalent XML into a buffer
+            shells, assets, submodels, concept_descriptions = read_aas_json_file(file_path_str)
+            buf = io.BytesIO()
+            write_aas_xml_file(buf, shells, assets, submodels, concept_descriptions)
+            buf.seek(0)
+            tree = ET.parse(buf)
+        except Exception as e:
+            print(f"Error converting JSON AAS file {file_path} to XML: {e}")
+            return []
+    
+    # -------------------------------------------------------
     # Handle .aasx (ZIP archive) and standard .xml
     # -------------------------------------------------------
-    if file_path_str.lower().endswith('.aasx'):
+    elif file_path_str.lower().endswith('.aasx'):
         try:
             with zipfile.ZipFile(file_path, 'r') as z:
                 # Find the main XML file inside the archive
@@ -53,9 +82,22 @@ def parse_capabilities_robust(file_path):
             print(f"Error reading file {file_path}: {e}")
             return []
 
-    # -------------------------------------------------------
-    # Core Parsing Logic
-    # -------------------------------------------------------
+    if tree is None:
+        return []
+
+    return _extract_capabilities_from_etree(tree)
+
+
+def _extract_capabilities_from_etree(tree: ET.ElementTree):
+    """
+    Core parsing logic shared by XML/AASX and JSON (converted to XML).
+
+    Args:
+        tree: Parsed ElementTree of an Asset Administration Shell.
+
+    Returns:
+        List of capability dictionaries with properties and relations.
+    """
     root = tree.getroot()
     ns = {'aas': 'https://admin-shell.io/aas/3/0'}
 
