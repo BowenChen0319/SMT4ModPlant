@@ -391,7 +391,7 @@ class HomePage(QWidget):
         self.worker = SMTWorker(self.recipe_path, self.resource_dir, self.mode_index, weights)
         self.worker.log_signal.connect(self.log_callback)
         self.worker.progress_signal.connect(lambda c, t: (self.pbar.setMaximum(t), self.pbar.setValue(c)))
-        self.worker.error_signal.connect(lambda e: InfoBar.error(title="Error", content=e, parent=self.window()))
+        self.worker.error_signal.connect(self.handle_error)
         self.worker.finished_signal.connect(self.on_finished)
         self.worker.start()
 
@@ -400,6 +400,15 @@ class HomePage(QWidget):
         InfoBar.success(title="Completed", content=f"Calculation finished.", parent=self, position=InfoBarPosition.TOP_RIGHT)
         self.results_widget.set_data(results, context_data)
         self.toggle_results_panel(True)
+
+    def handle_error(self, err_msg):
+        """
+        Show error InfoBar and reset UI so user can retry without restarting the app.
+        """
+        self.pbar.setMaximum(100)
+        self.pbar.setValue(0)
+        self.btn_run.setEnabled(True)
+        InfoBar.error(title="Error", content=err_msg, parent=self, position=InfoBarPosition.TOP_RIGHT)
 
     def resizeEvent(self, event):
         if self.right_container.width() > 0:
