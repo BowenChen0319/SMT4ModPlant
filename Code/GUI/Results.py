@@ -441,6 +441,15 @@ class ResultsWidget(QWidget):
     # -------------------------
     # Table rendering (kept compatible with existing columns)
     # -------------------------
+    def _format_capabilities_text(self, raw_capabilities) -> str:
+        """Format capabilities for readable full display in table cells."""
+        if isinstance(raw_capabilities, (list, tuple, set)):
+            return "\n".join(str(x) for x in raw_capabilities)
+        text = str(raw_capabilities) if raw_capabilities is not None else ""
+        if ", " in text:
+            return text.replace(", ", ",\n")
+        return text
+
     def update_table(self, data: List[Dict]):
         """Update results table. Adds a leading checkbox column."""
         if not data:
@@ -453,8 +462,8 @@ class ResultsWidget(QWidget):
 
         # headers/columns (checkbox + previous layout)
         if has_score:
-            headers = ["", "Sol ID", "Score", "Step", "Description", "Resource", "Capabilities", "Energy", "Use", "CO2"]
-            self.table.setColumnCount(10)
+            headers = ["", "Sol ID", "Step", "Resource", "Capabilities", "Weighted Energy", "Weighted Use", "Weighted CO2"]
+            self.table.setColumnCount(8)
         else:
             headers = ["", "Sol ID", "Step", "Description", "Resource", "Capabilities", "Status"]
             self.table.setColumnCount(7)
@@ -462,11 +471,14 @@ class ResultsWidget(QWidget):
         self.table.setSortingEnabled(False)
         self.table.blockSignals(True)
         self.table.clearContents()
+        self.table.clearSpans()
         self.table.setHorizontalHeaderLabels(headers)
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        cap_col_idx = 6 if has_score else 5
-        self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.Stretch)
+        cap_col_idx = 4 if has_score else 5
+        self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionsClickable(False)
+        self.table.horizontalHeader().setSortIndicatorShown(False)
 
         self.table.setRowCount(len(data))
 
@@ -481,36 +493,54 @@ class ResultsWidget(QWidget):
 
             current_sol_id = row_data.get("solution_id", -1)
 
-            # checkbox: only show selectable checkbox for first row of each solution
-            chk_item = QTableWidgetItem()
-            if current_sol_id != last_sol_id and current_sol_id != -1:
-                chk_item.setCheckState(Qt.CheckState.Unchecked)
-                chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-                last_sol_id = current_sol_id
-            else:
-                chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.table.setItem(r, 0, chk_item)
-
             if has_score:
-                self.table.setItem(r, 1, QTableWidgetItem(str(row_data.get("solution_id", ""))))
-                self.table.setItem(r, 2, QTableWidgetItem(f"{row_data.get('composite_score', 0):.2f}"))
-                self.table.setItem(r, 3, QTableWidgetItem(str(row_data.get("step_id", ""))))
-                self.table.setItem(r, 4, QTableWidgetItem(str(row_data.get("description", ""))))
-                self.table.setItem(r, 5, QTableWidgetItem(str(row_data.get("resource", ""))))
-                self.table.setItem(r, 6, QTableWidgetItem(str(row_data.get("capabilities", ""))))
-                self.table.setItem(r, 7, QTableWidgetItem(f"{row_data.get('energy_cost', 0):.1f}"))
-                self.table.setItem(r, 8, QTableWidgetItem(f"{row_data.get('use_cost', 0):.1f}"))
-                self.table.setItem(r, 9, QTableWidgetItem(f"{row_data.get('co2_footprint', 0):.1f}"))
+                if row_data.get("is_solution_header"):
+                    # Checkbox and export ID are on the solution header row.
+                    chk_item = QTableWidgetItem()
+                    if current_sol_id != -1:
+                        chk_item.setCheckState(Qt.CheckState.Unchecked)
+                        chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                    else:
+                        chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                    self.table.setItem(r, 0, chk_item)
+
+                    self.table.setItem(r, 1, QTableWidgetItem(str(current_sol_id if current_sol_id != -1 else "")))
+                    summary = f"Sol {current_sol_id}, Total Weighted Cost = {row_data.get('composite_score', 0):.2f}"
+                    summary_item = QTableWidgetItem(summary)
+                    summary_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                    self.table.setItem(r, 2, summary_item)
+                    self.table.setSpan(r, 2, 1, self.table.columnCount() - 2)
+                else:
+                    chk_item = QTableWidgetItem()
+                    chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                    self.table.setItem(r, 0, chk_item)
+                    self.table.setItem(r, 1, QTableWidgetItem(""))
+                    self.table.setItem(r, 2, QTableWidgetItem(str(row_data.get("step_id", ""))))
+                    self.table.setItem(r, 3, QTableWidgetItem(str(row_data.get("resource", ""))))
+                    self.table.setItem(r, 4, QTableWidgetItem(self._format_capabilities_text(row_data.get("capabilities", ""))))
+                    self.table.setItem(r, 5, QTableWidgetItem(f"{row_data.get('energy_cost', 0):.1f}"))
+                    self.table.setItem(r, 6, QTableWidgetItem(f"{row_data.get('use_cost', 0):.1f}"))
+                    self.table.setItem(r, 7, QTableWidgetItem(f"{row_data.get('co2_footprint', 0):.1f}"))
             else:
+                # checkbox: only show selectable checkbox for first row of each solution
+                chk_item = QTableWidgetItem()
+                if current_sol_id != last_sol_id and current_sol_id != -1:
+                    chk_item.setCheckState(Qt.CheckState.Unchecked)
+                    chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                    last_sol_id = current_sol_id
+                else:
+                    chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
+                self.table.setItem(r, 0, chk_item)
+
                 self.table.setItem(r, 1, QTableWidgetItem(str(row_data.get("solution_id", ""))))
                 self.table.setItem(r, 2, QTableWidgetItem(str(row_data.get("step_id", ""))))
                 self.table.setItem(r, 3, QTableWidgetItem(str(row_data.get("description", ""))))
                 self.table.setItem(r, 4, QTableWidgetItem(str(row_data.get("resource", ""))))
-                self.table.setItem(r, 5, QTableWidgetItem(str(row_data.get("capabilities", ""))))
+                self.table.setItem(r, 5, QTableWidgetItem(self._format_capabilities_text(row_data.get("capabilities", ""))))
                 status_item = QTableWidgetItem(str(row_data.get("status", "")))
                 status_item.setForeground(QColor("#28a745"))
                 self.table.setItem(r, 6, status_item)
 
         self.table.blockSignals(False)
         self.table.resizeRowsToContents()
-        self.table.setSortingEnabled(True)
+        self.table.setSortingEnabled(False)

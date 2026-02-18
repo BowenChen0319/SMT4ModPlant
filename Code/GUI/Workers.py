@@ -113,15 +113,32 @@ class SMTWorker(QThread):
                 for idx, eval_sol in enumerate(evaluated_solutions):
                     sol_id = eval_sol['solution_id']
                     rows = [r for r in gui_results if r.get('solution_id') == sol_id]
-                    if sorted_gui_results and rows:
-                        sorted_gui_results.append({})  # spacer between solutions
+                    if not rows:
+                        continue
+
+                    # Header row per solution (replaces old blank spacer row)
+                    sorted_gui_results.append({
+                        "is_solution_header": True,
+                        "solution_id": sol_id,
+                        "composite_score": eval_sol['composite_score'],
+                    })
                     
                     for row in rows:
-                        row['composite_score'] = eval_sol['composite_score']
-                        row['energy_cost'] = eval_sol['total_energy_cost']
-                        row['use_cost'] = eval_sol['total_use_cost']
-                        row['co2_footprint'] = eval_sol['total_co2_footprint']
-                        sorted_gui_results.append(row)
+                        row_copy = dict(row)
+                        row_copy['composite_score'] = eval_sol['composite_score']
+
+                        # Per-operation values (based on this row's assigned resource),
+                        # not the whole solution aggregate.
+                        resource_str = str(row_copy.get('resource', ''))
+                        resource_name = resource_str.split(': ')[1] if ': ' in resource_str else resource_str
+                        cost_data = optimizer.resource_costs.get(resource_name, {})
+                        energy_raw = float(cost_data.get('EnergyCost', 0.0))
+                        use_raw = float(cost_data.get('UseCost', 0.0))
+                        co2_raw = float(cost_data.get('CO2Footprint', 0.0))
+                        row_copy['energy_cost'] = energy_raw * optimizer.weights["EnergyCost"]
+                        row_copy['use_cost'] = use_raw * optimizer.weights["UseCost"]
+                        row_copy['co2_footprint'] = co2_raw * optimizer.weights["CO2Footprint"]
+                        sorted_gui_results.append(row_copy)
                 
                 gui_results = sorted_gui_results
                 if evaluated_solutions:
