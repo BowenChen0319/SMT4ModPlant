@@ -15,7 +15,7 @@ except ImportError as e:
     print(f"Specific Error: {e}")
 
 class SMTWorker(QThread):
-    """Background thread that handles parsing inputs, running SMT, and optional optimization."""
+    """Background thread that handles parsing inputs, running calculation, and optional weighted sorting."""
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int, int)
     # [MODIFIED] Signal now carries (gui_data_list, context_dict)
@@ -26,11 +26,11 @@ class SMTWorker(QThread):
         super().__init__()
         self.recipe_path = recipe_path
         self.resource_dir = resource_dir
-        self.mode_index = mode_index # 0:SMT(all solutions), 1:OPT(best from multi)
+        self.mode_index = mode_index  # 0: all results, 1: weighted sorted all results
         self.weights = weights 
 
     def run(self):
-        """Execute the end-to-end workflow: parse inputs, solve SMT, optionally rank solutions."""
+        """Execute the end-to-end workflow: parse inputs, solve constraints, and optionally sort by weighted cost."""
         try:
             current_phase = "Recipe"
             # 1. Parsing
@@ -72,13 +72,13 @@ class SMTWorker(QThread):
             self.log_signal.emit(f"Loaded {len(all_capabilities)} valid resources.")
             if not all_capabilities: raise ValueError("No valid resources loaded.")
 
-            # 2. SMT Logic Configuration
+            # 2. Calculation mode configuration
             current_phase = "Calculation"
-            find_all = True  # SMT lists every solution; OPT also needs the full set before ranking
+            find_all = True  # both modes need the full solution set
             is_opt = (self.mode_index == 1)
             
-            mode_names = ['SMT (All Solutions)', 'OPT (Best from Multi)']
-            self.log_signal.emit(f"Starting SMT Logic (Mode: {mode_names[self.mode_index]})...")
+            mode_names = ["All Results", "Weighted Sorted Results"]
+            self.log_signal.emit(f"Starting Calculation (Mode: {mode_names[self.mode_index]})...")
             
             # SMT run
             # Note: run_optimization returns (gui_results, json_solutions)
@@ -98,9 +98,9 @@ class SMTWorker(QThread):
             
             self.progress_signal.emit(60, 100)
 
-            # 3. OPT Logic: rank all solutions and keep best; SMT just shows all raw solutions
+            # 3. Weighted mode: rank all solutions; default mode shows raw all results
             if is_opt and json_solutions:
-                self.log_signal.emit("OPT Mode: Calculating costs and selecting best solution...")
+                self.log_signal.emit("Weighted mode: Calculating costs and sorting all solutions...")
                 
                 optimizer = SolutionOptimizer()
                 optimizer.set_weights(*self.weights)
@@ -125,7 +125,7 @@ class SMTWorker(QThread):
                 
                 gui_results = sorted_gui_results
                 if evaluated_solutions:
-                    self.log_signal.emit(f"Optimization complete. Best Solution ID: {evaluated_solutions[0]['solution_id']}")
+                    self.log_signal.emit(f"Weighted sorting complete. Top Solution ID: {evaluated_solutions[0]['solution_id']}")
 
             self.progress_signal.emit(100, 100)
             

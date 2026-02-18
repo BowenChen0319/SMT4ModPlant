@@ -17,7 +17,7 @@ from Code.GUI.Results import ResultsWidget
 class HomePage(QWidget):
     def __init__(self, log_callback, parent=None):
         super().__init__(parent)
-        """Main landing page that gathers user input and triggers SMT/OPT runs."""
+        """Main landing page that gathers user input and triggers result calculations."""
         self.setObjectName("home_page")
         self.log_callback = log_callback
         
@@ -157,8 +157,8 @@ class HomePage(QWidget):
         l_mode.setContentsMargins(20, 20, 20, 20)
         icon_mode = IconWidget(FluentIcon.SPEED_HIGH, self)
         lbl_mode = SubtitleLabel("Solution Type", self)
-        self.cb_smt = CheckBox("SMT (Get All Solution)", self)
-        self.cb_opt = CheckBox("OPT (Get Best One from Multi-Solution)", self)
+        self.cb_smt = CheckBox("Get All Results", self)
+        self.cb_opt = CheckBox("Get All Results Sorted by Weighted Cost", self)
         self.cb_smt.setChecked(True)
         self.cb_opt.setChecked(False)
         self.cb_smt.stateChanged.connect(self.on_smt_checked)
@@ -212,7 +212,7 @@ class HomePage(QWidget):
         self.card_weights.setVisible(False)
 
         # Button & Progress
-        self.btn_run = PrimaryPushButton("Start Calculation in SMT Mode", self)
+        self.btn_run = PrimaryPushButton("Start Calculation (All Results)", self)
         self.btn_run.setEnabled(False)
         self.btn_run.clicked.connect(self.run_process)
         layout.addWidget(self.btn_run)
@@ -298,28 +298,28 @@ class HomePage(QWidget):
     # Logic: Mode Selection
     # -----------------------------------------------------
     def on_smt_checked(self, state):
-        """Keep SMT checkbox mutually exclusive and update UI for SMT mode."""
+        """Keep mode checkboxes mutually exclusive and set All Results mode."""
         if state == Qt.CheckState.Checked.value: 
             self.cb_opt.blockSignals(True)
             self.cb_opt.setChecked(False)
             self.cb_opt.blockSignals(False)
             self.mode_index = 0
             self.toggle_weights_animation(False)
-            self.btn_run.setText("Start Calculation in SMT Mode")
+            self.btn_run.setText("Start Calculation (All Results)")
             self.update_run_button_style(0)
             self.notify_color_change("#107C10")
         else:
             if not self.cb_opt.isChecked(): self.cb_smt.setChecked(True)
 
     def on_opt_checked(self, state):
-        """Keep OPT checkbox mutually exclusive and update UI for OPT mode."""
+        """Keep mode checkboxes mutually exclusive and set Weighted Sorted mode."""
         if state == Qt.CheckState.Checked.value: 
             self.cb_smt.blockSignals(True)
             self.cb_smt.setChecked(False)
             self.cb_smt.blockSignals(False)
             self.mode_index = 1
             self.toggle_weights_animation(True)
-            self.btn_run.setText("Start Calculation in OPT Mode")
+            self.btn_run.setText("Start Calculation (Weighted Sorted)")
             self.update_run_button_style(1)
             self.notify_color_change("#FF8C00")
         else:
@@ -386,7 +386,14 @@ class HomePage(QWidget):
     def select_recipe(self):
         """Prompt for a General Recipe XML file and update state."""
         options = QFileDialog.Option.DontUseNativeDialog
-        f, _ = QFileDialog.getOpenFileName(self, "Select Recipe XML", os.getcwd(), "XML Files (*.xml)", options=options)
+        start_dir = os.path.expanduser("~/Downloads")
+        f, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Recipe XML",
+            start_dir,
+            "XML Files (*.xml);;All Files (*)",
+            options=options
+        )
         if f:
             self.recipe_path = os.path.normpath(f)
             self.lbl_recipe_val.setText(os.path.basename(self.recipe_path))
@@ -395,7 +402,14 @@ class HomePage(QWidget):
     def select_folder(self):
         """Prompt for the resources directory and update state."""
         options = QFileDialog.Option.DontUseNativeDialog
-        d = QFileDialog.getExistingDirectory(self, "Select Resources Folder", os.getcwd(), options=options)
+        start_dir = os.path.expanduser("~/Downloads")
+        d = QFileDialog.getExistingDirectory(
+            self,
+            "Select Resources Folder",
+            start_dir,
+            options=options
+        )
+
         if d:
             self.resource_dir = os.path.normpath(d)
             self.lbl_res_val.setText(self.resource_dir)
@@ -407,7 +421,7 @@ class HomePage(QWidget):
             self.btn_run.setEnabled(True)
 
     def run_process(self):
-        """Instantiate the worker thread and kick off SMT/OPT processing."""
+        """Instantiate the worker thread and kick off result calculation processing."""
         self.btn_run.setEnabled(False)
         self.log_callback("Starting Process...")
         weights = self.get_weights()
