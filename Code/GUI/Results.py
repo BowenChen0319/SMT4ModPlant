@@ -20,6 +20,7 @@ from qfluentwidgets import (
     PushButton,
     InfoBar,
     InfoBarPosition,
+    CheckBox,
 )
 
 # Import Generator
@@ -127,14 +128,22 @@ class ResultsWidget(QWidget):
         self.btn_param_validate.setVisible(False)
 
     def on_item_changed(self, item: QTableWidgetItem):
-        """Enable export when at least one checkbox is checked."""
+        """Keep export button state in sync when item-based checkbox changes."""
         if item.column() != 0:
             return
+        self._update_export_button_state()
 
+    def _row_is_checked(self, row: int) -> bool:
+        cb = self.table.cellWidget(row, 0)
+        if isinstance(cb, CheckBox):
+            return cb.isChecked()
+        chk_item = self.table.item(row, 0)
+        return bool(chk_item and chk_item.checkState() == Qt.CheckState.Checked)
+
+    def _update_export_button_state(self):
         checked_count = 0
         for r in range(self.table.rowCount()):
-            chk_item = self.table.item(r, 0)
-            if chk_item and chk_item.checkState() == Qt.CheckState.Checked:
+            if self._row_is_checked(r):
                 checked_count += 1
 
         self.btn_export.setEnabled(checked_count > 0)
@@ -152,8 +161,7 @@ class ResultsWidget(QWidget):
 
         selected_sol_ids = set()
         for r in range(self.table.rowCount()):
-            chk_item = self.table.item(r, 0)
-            if chk_item and chk_item.checkState() == Qt.CheckState.Checked:
+            if self._row_is_checked(r):
                 sol_id_item = self.table.item(r, 1)
                 if sol_id_item and (sol_id_item.text() or "").isdigit():
                     selected_sol_ids.add(int(sol_id_item.text()))
@@ -234,6 +242,7 @@ class ResultsWidget(QWidget):
     def validate_master_recipe(self):
         main = self.window()
         start_dir = os.path.expanduser("~/Downloads")
+        options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
                 d = main.settings_page.get_export_path()
@@ -244,19 +253,32 @@ class ResultsWidget(QWidget):
 
         xml_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Master Recipe XML",
+            "Validate Master Recipe - Step 1/2: Select the Master Recipe XML file to validate",
             start_dir,
             "XML Files (*.xml);;All Files (*)",
+            options=options,
         )
         if not xml_path:
             return
 
         schema_dir = QFileDialog.getExistingDirectory(
             self,
-            "Select allschema Folder (XSD set)",
+            "Validate Master Recipe - Step 2/2: Select the folder that contains XSD schema files",
             start_dir,
+            options=options,
         )
         if not schema_dir:
+            return
+        if not any(name.lower().endswith(".xsd") for name in os.listdir(schema_dir)):
+            InfoBar.error(
+                title="Validation Error",
+                content="Selected folder does not contain any .xsd files.",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP_RIGHT,
+                duration=6000,
+                parent=self.window(),
+            )
             return
 
         try:
@@ -312,6 +334,7 @@ class ResultsWidget(QWidget):
     def validate_parameters(self):
         main = self.window()
         start_dir = os.path.expanduser("~/Downloads")
+        options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
                 d = main.settings_page.get_export_path()
@@ -322,19 +345,31 @@ class ResultsWidget(QWidget):
 
         xml_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Master Recipe XML",
+            "Parameter Validation - Step 1: Select the Master Recipe XML file (resource folder may be requested)",
             start_dir,
             "XML Files (*.xml);;All Files (*)",
+            options=options,
         )
         if not xml_path:
             return
+
+        def _has_usable_resources(data) -> bool:
+            if not isinstance(data, dict) or not data:
+                return False
+            # Accept both capability-map and uuid-index like shapes
+            for v in data.values():
+                if isinstance(v, list) and len(v) > 0:
+                    return True
+                if isinstance(v, dict) and len(v) > 0:
+                    return True
+            return False
 
         resources_data = None
         if isinstance(self.context_data, dict) and "resources" in self.context_data:
             resources_data = self.context_data.get("resources")
 
-        # If no cached resources exist, parse on-demand
-        if not resources_data:
+        # If cached resources are missing/invalid, parse on-demand
+        if not _has_usable_resources(resources_data):
             if parse_capabilities_robust is None:
                 InfoBar.error(
                     title="Parameter Validation Error",
@@ -348,10 +383,22 @@ class ResultsWidget(QWidget):
 
             resource_dir = QFileDialog.getExistingDirectory(
                 self,
-                "Select Resource Directory (AAS XML/AASX)",
+                "Parameter Validation - Step 2: Select the resource folder (AAS XML/AASX)",
                 start_dir,
+                options=options,
             )
             if not resource_dir:
+                return
+            if not any(name.lower().endswith((".xml", ".aasx")) for name in os.listdir(resource_dir)):
+                InfoBar.error(
+                    title="Parameter Validation Error",
+                    content="Selected folder does not contain any .xml or .aasx files.",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP_RIGHT,
+                    duration=6000,
+                    parent=self.window(),
+                )
                 return
 
             self._append_log(f"[PARAM-VALIDATION] Parsing resources from: {resource_dir}")
@@ -375,6 +422,17 @@ class ResultsWidget(QWidget):
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP_RIGHT,
+                    parent=self.window(),
+                )
+                return
+            if not _has_usable_resources(resources_data):
+                InfoBar.error(
+                    title="Parameter Validation Error",
+                    content="No valid resource capabilities could be parsed from selected folder.",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP_RIGHT,
+                    duration=7000,
                     parent=self.window(),
                 )
                 return
@@ -475,6 +533,8 @@ class ResultsWidget(QWidget):
         self.table.setHorizontalHeaderLabels(headers)
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(0, 42)
         cap_col_idx = 4 if has_score else 5
         self.table.horizontalHeader().setSectionResizeMode(cap_col_idx, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionsClickable(False)
@@ -496,16 +556,17 @@ class ResultsWidget(QWidget):
             if has_score:
                 if row_data.get("is_solution_header"):
                     # Checkbox and export ID are on the solution header row.
-                    chk_item = QTableWidgetItem()
                     if current_sol_id != -1:
-                        chk_item.setCheckState(Qt.CheckState.Unchecked)
-                        chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                        cb = CheckBox(self.table)
+                        cb.stateChanged.connect(lambda _state: self._update_export_button_state())
+                        self.table.setCellWidget(r, 0, cb)
                     else:
+                        chk_item = QTableWidgetItem()
                         chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                    self.table.setItem(r, 0, chk_item)
+                        self.table.setItem(r, 0, chk_item)
 
                     self.table.setItem(r, 1, QTableWidgetItem(str(current_sol_id if current_sol_id != -1 else "")))
-                    summary = f"Sol {current_sol_id}, Total Weighted Cost = {row_data.get('composite_score', 0):.2f}"
+                    summary = f"Solution {current_sol_id}, Total Weighted Cost = {row_data.get('composite_score', 0):.2f}"
                     summary_item = QTableWidgetItem(summary)
                     summary_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
                     self.table.setItem(r, 2, summary_item)
@@ -523,14 +584,15 @@ class ResultsWidget(QWidget):
                     self.table.setItem(r, 7, QTableWidgetItem(f"{row_data.get('co2_footprint', 0):.1f}"))
             else:
                 # checkbox: only show selectable checkbox for first row of each solution
-                chk_item = QTableWidgetItem()
                 if current_sol_id != last_sol_id and current_sol_id != -1:
-                    chk_item.setCheckState(Qt.CheckState.Unchecked)
-                    chk_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                    cb = CheckBox(self.table)
+                    cb.stateChanged.connect(lambda _state: self._update_export_button_state())
+                    self.table.setCellWidget(r, 0, cb)
                     last_sol_id = current_sol_id
                 else:
+                    chk_item = QTableWidgetItem()
                     chk_item.setFlags(Qt.ItemFlag.NoItemFlags)
-                self.table.setItem(r, 0, chk_item)
+                    self.table.setItem(r, 0, chk_item)
 
                 self.table.setItem(r, 1, QTableWidgetItem(str(row_data.get("solution_id", ""))))
                 self.table.setItem(r, 2, QTableWidgetItem(str(row_data.get("step_id", ""))))
@@ -544,3 +606,4 @@ class ResultsWidget(QWidget):
         self.table.blockSignals(False)
         self.table.resizeRowsToContents()
         self.table.setSortingEnabled(False)
+        self._update_export_button_state()
