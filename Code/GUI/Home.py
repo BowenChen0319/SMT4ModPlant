@@ -1,8 +1,9 @@
 # Code/GUI/Home.py
 import os
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QProgressBar, QFrame, QSizePolicy, QScrollArea, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QProgressBar, QFrame, QSizePolicy, QScrollArea, QApplication, QLabel
 )
 from qfluentwidgets import (
     CardWidget, IconWidget, BodyLabel, CaptionLabel, 
@@ -34,6 +35,10 @@ class HomePage(QWidget):
         setThemeColor("#00629B")
         
         self.init_ui()
+
+    def _get_logo_path(self):
+        """Return absolute path of the RWTH logo image in this package."""
+        return os.path.join(os.path.dirname(__file__), "rwth_logo.png")
         
     def init_ui(self):
         """Build the overall two-panel layout and wire initial UI components."""
@@ -222,6 +227,23 @@ class HomePage(QWidget):
         layout.addWidget(self.pbar)
         
         layout.addStretch()
+
+        # Bottom-left logo
+        self.logo_label = QLabel(self)
+        pixmap = QPixmap(self._get_logo_path())
+        if not pixmap.isNull():
+            self.logo_label.setPixmap(
+                pixmap.scaledToWidth(420, Qt.TransformationMode.SmoothTransformation)
+            )
+        self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+        self.logo_label.setStyleSheet("background-color: transparent;")
+
+        logo_layout = QHBoxLayout()
+        logo_layout.setContentsMargins(0, 0, 0, 0)
+        logo_layout.addWidget(self.logo_label, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+        logo_layout.addStretch(1)
+        layout.addLayout(logo_layout)
+
         self.update_run_button_style(0)
 
     # -----------------------------------------------------
