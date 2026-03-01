@@ -113,6 +113,47 @@ class ResultsWidget(QWidget):
         program_path = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else os.getcwd()
         return os.path.dirname(program_path)
 
+    @staticmethod
+    def _dialog_options():
+        """
+        Use native file dialogs on Windows to avoid stale/empty initial listings
+        in folders like Downloads. Keep non-native dialogs on other platforms.
+        """
+        options = QFileDialog.Option(0)
+        if os.name != "nt":
+            options |= QFileDialog.Option.DontUseNativeDialog
+        return options
+
+    def _open_file_dialog(self, title: str, start_dir: str, name_filter: str):
+        """Open a single-file picker with explicit window title."""
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setDirectory(start_dir)
+        dialog.setNameFilter(name_filter)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dialog.setOptions(self._dialog_options())
+        if dialog.exec():
+            files = dialog.selectedFiles()
+            if files:
+                return files[0]
+        return ""
+
+    def _open_directory_dialog(self, title: str, start_dir: str):
+        """Open a directory picker with explicit window title."""
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setDirectory(start_dir)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        if os.name != "nt":
+            dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        if dialog.exec():
+            dirs = dialog.selectedFiles()
+            if dirs:
+                return dirs[0]
+        return ""
+
     # -------------------------
     # Styling sync (export button)
     # -------------------------
@@ -256,7 +297,6 @@ class ResultsWidget(QWidget):
     def validate_master_recipe(self):
         main = self.window()
         start_dir = self._default_user_dir()
-        options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
                 d = main.settings_page.get_export_path()
@@ -265,21 +305,17 @@ class ResultsWidget(QWidget):
             except Exception:
                 pass
 
-        xml_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Validate Master Recipe - Step 1/2: Select the Master Recipe XML file to validate",
-            start_dir,
-            "XML Files (*.xml);;All Files (*)",
-            options=options,
+        xml_path = self._open_file_dialog(
+            title="Validate Master Recipe - Step 1/2: Select Master Recipe XML",
+            start_dir=start_dir,
+            name_filter="XML Files (*.xml);;All Files (*)",
         )
         if not xml_path:
             return
 
-        schema_dir = QFileDialog.getExistingDirectory(
-            self,
-            "Validate Master Recipe - Step 2/2: Select the folder that contains XSD schema files",
-            self._program_dir(),
-            options=options,
+        schema_dir = self._open_directory_dialog(
+            title="Validate Master Recipe - Step 2/2: Select XSD Schema Folder",
+            start_dir=self._program_dir(),
         )
         if not schema_dir:
             return
@@ -348,7 +384,6 @@ class ResultsWidget(QWidget):
     def validate_parameters(self):
         main = self.window()
         start_dir = self._default_user_dir()
-        options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
                 d = main.settings_page.get_export_path()
@@ -357,12 +392,10 @@ class ResultsWidget(QWidget):
             except Exception:
                 pass
 
-        xml_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Parameter Validation - Step 1: Select the Master Recipe XML file (resource folder may be requested)",
-            start_dir,
-            "XML Files (*.xml);;All Files (*)",
-            options=options,
+        xml_path = self._open_file_dialog(
+            title="Parameter Validation: Select Master Recipe XML",
+            start_dir=start_dir,
+            name_filter="XML Files (*.xml);;All Files (*)",
         )
         if not xml_path:
             return
@@ -395,11 +428,9 @@ class ResultsWidget(QWidget):
                 )
                 return
 
-            resource_dir = QFileDialog.getExistingDirectory(
-                self,
-                "Parameter Validation - Step 2: Select the resource folder (AAS XML/AASX/JSON)",
-                start_dir,
-                options=options,
+            resource_dir = self._open_directory_dialog(
+                title="Parameter Validation: Select Resource Folder (AAS XML/AASX/JSON)",
+                start_dir=start_dir,
             )
             if not resource_dir:
                 return

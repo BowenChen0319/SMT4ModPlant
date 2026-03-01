@@ -153,6 +153,28 @@ class SettingsPage(QWidget):
         downloads = os.path.normpath(os.path.join(os.path.expanduser("~"), "Downloads"))
         return downloads if os.path.isdir(downloads) else os.path.expanduser("~")
 
+    @staticmethod
+    def _dialog_options():
+        """Use native dialogs on Windows; keep non-native style on macOS/others."""
+        options = QFileDialog.Option(0)
+        if os.name != "nt":
+            options |= QFileDialog.Option.DontUseNativeDialog
+        return options
+
+    def _open_directory_dialog(self, title: str, start_dir: str) -> str:
+        """Open a directory picker with explicit title."""
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setDirectory(start_dir)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOptions(self._dialog_options())
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        if dialog.exec():
+            dirs = dialog.selectedFiles()
+            if dirs:
+                return dirs[0]
+        return ""
+
     def toggle_path_mode(self, checked):
         """Enable or disable the browse button based on the switch state."""
         self.btn_browse.setEnabled(checked)
@@ -161,7 +183,7 @@ class SettingsPage(QWidget):
 
     def browse_path(self):
         """Open a dialog to select a custom export directory."""
-        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", self.line_path.text())
+        d = self._open_directory_dialog("Select Export Directory", self.line_path.text())
         if d:
             self.line_path.setText(d)
 

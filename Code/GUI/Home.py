@@ -50,6 +50,44 @@ class HomePage(QWidget):
         """Return the directory where the application/script is located."""
         program_path = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else os.getcwd()
         return os.path.dirname(program_path)
+
+    @staticmethod
+    def _dialog_options():
+        """Use native dialogs on Windows; keep non-native style on macOS/others."""
+        options = QFileDialog.Option(0)
+        if os.name != "nt":
+            options |= QFileDialog.Option.DontUseNativeDialog
+        return options
+
+    def _open_file_dialog(self, title: str, start_dir: str, name_filter: str) -> str:
+        """Open a single-file picker with explicit title."""
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setDirectory(start_dir)
+        dialog.setNameFilter(name_filter)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dialog.setOptions(self._dialog_options())
+        if dialog.exec():
+            files = dialog.selectedFiles()
+            if files:
+                return files[0]
+        return ""
+
+    def _open_directory_dialog(self, title: str, start_dir: str) -> str:
+        """Open a directory picker with explicit title."""
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setDirectory(start_dir)
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        if os.name != "nt":
+            dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        if dialog.exec():
+            dirs = dialog.selectedFiles()
+            if dirs:
+                return dirs[0]
+        return ""
         
     def init_ui(self):
         """Build the overall two-panel layout and wire initial UI components."""
@@ -405,8 +443,7 @@ class HomePage(QWidget):
     def browse_path(self):
         """Open a directory chooser for the export location."""
         start_dir = self.current_export_path if os.path.exists(self.current_export_path) else os.getcwd()
-        options = QFileDialog.Option.DontUseNativeDialog
-        d = QFileDialog.getExistingDirectory(self, "Select Export Directory", start_dir, options=options)
+        d = self._open_directory_dialog("Select Export Directory", start_dir)
         if d:
             norm_d = os.path.normpath(d)
             self.current_export_path = norm_d
@@ -418,14 +455,11 @@ class HomePage(QWidget):
 
     def select_recipe(self):
         """Prompt for a General Recipe XML file and update state."""
-        options = QFileDialog.Option.DontUseNativeDialog
         start_dir = self._program_dir()
-        f, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Recipe XML",
-            start_dir,
-            "XML Files (*.xml);;All Files (*)",
-            options=options
+        f = self._open_file_dialog(
+            title="Select General Recipe XML",
+            start_dir=start_dir,
+            name_filter="XML Files (*.xml);;All Files (*)",
         )
         if f:
             self.recipe_path = os.path.normpath(f)
@@ -434,14 +468,8 @@ class HomePage(QWidget):
 
     def select_folder(self):
         """Prompt for the resources directory and update state."""
-        options = QFileDialog.Option.DontUseNativeDialog
         start_dir = self._program_dir()
-        d = QFileDialog.getExistingDirectory(
-            self,
-            "Select Resources Folder",
-            start_dir,
-            options=options
-        )
+        d = self._open_directory_dialog("Select Resources Folder (XML/AASX/JSON)", start_dir)
 
         if d:
             self.resource_dir = os.path.normpath(d)
