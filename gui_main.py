@@ -4,7 +4,7 @@ import sys
 import os
 # ... (Imports and Bundle Fixes stay same) ...
 
-# % pyinstaller --noconsole --name="SMT4ModPlant" --clean \                                          
+# % pyinstaller --noconsole --name="PlantConfigurator" --clean \                                          
 #  --collect-all qfluentwidgets \
 #  --collect-all z3 \
 #  --icon="Others/logo.icns" \

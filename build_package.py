@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform PyInstaller build helper for SMT4ModPlant."""
+"""Cross-platform PyInstaller build helper for PlantConfigurator."""
 
 from __future__ import annotations
 
@@ -73,9 +73,9 @@ def build_command(project_root: Path, args: argparse.Namespace) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build SMT4ModPlant with PyInstaller (Windows/macOS aware)."
+        description="Build PlantConfigurator with PyInstaller (Windows/macOS aware)."
     )
-    parser.add_argument("--name", default="SMT4ModPlant", help="Application name.")
+    parser.add_argument("--name", default="PlantConfigurator", help="Application name.")
     parser.add_argument("--entry", default="gui_main.py", help="Entry script path.")
     parser.add_argument("--clean", dest="clean", action="store_true", help="Use --clean.")
     parser.add_argument("--no-clean", dest="clean", action="store_false", help="Disable --clean.")
