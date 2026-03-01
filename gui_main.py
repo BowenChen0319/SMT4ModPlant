@@ -20,6 +20,7 @@ from qfluentwidgets import (
 try:
     from Code.GUI.Home import HomePage
     from Code.GUI.Logs import LogPage
+    from Code.GUI.RecipeValidator import RecipeValidatorPage
 except ImportError as e:
     print(f"Error: {e}")
     sys.exit(1)
@@ -39,12 +40,13 @@ class MainWindow(FluentWindow):
             self.move(geo.width()//2 - self.width()//2, geo.height()//2 - self.height()//2)
         
         self.log_page = LogPage(self)
+        self.recipe_validator_page = RecipeValidatorPage(self)
         
         self.home_page = HomePage(self.log_callback_shim, self)
         
         # Add Navigation
         self.addSubInterface(self.home_page, FluentIcon.HOME, "Home", NavigationItemPosition.TOP)
-        # self.addSubInterface(self.results_page, FluentIcon.ACCEPT, "Results", NavigationItemPosition.TOP) <-- [删除]
+        self.addSubInterface(self.recipe_validator_page, FluentIcon.ACCEPT, "Recipe Validator", NavigationItemPosition.TOP)
         self.addSubInterface(self.log_page, FluentIcon.DOCUMENT, "Log", NavigationItemPosition.TOP)
         
         self.switchTo(self.home_page)

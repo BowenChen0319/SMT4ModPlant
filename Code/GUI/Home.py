@@ -498,6 +498,9 @@ class HomePage(QWidget):
         self.btn_run.setEnabled(True)
         InfoBar.success(title="Completed", content=f"Calculation finished.", parent=self, position=InfoBarPosition.TOP_RIGHT)
         self.results_widget.set_data(results, context_data)
+        main = self.window()
+        if hasattr(main, "recipe_validator_page") and hasattr(main.recipe_validator_page, "set_context_data"):
+            main.recipe_validator_page.set_context_data(context_data)
         self.toggle_results_panel(True)
 
     def handle_error(self, err_msg):

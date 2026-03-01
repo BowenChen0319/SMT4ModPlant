@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QHBoxLayout,
     QFileDialog,
-    QSizePolicy,
 )
 
 from qfluentwidgets import (
@@ -55,39 +54,12 @@ class ResultsWidget(QWidget):
         header_layout = QHBoxLayout()
         self.title = SubtitleLabel("Calculation Results", self)
 
-        # --- NEW: validation buttons ---
-        self.btn_validate = PushButton("Validate Master Recipe", self)
-        self.btn_validate.setVisible(False)
-        self.btn_validate.clicked.connect(self.validate_master_recipe)
-
-        self.btn_param_validate = PushButton("Parameter Validierung", self)
-        self.btn_param_validate.setVisible(False)
-        self.btn_param_validate.clicked.connect(self.validate_parameters)
-
         self.btn_export = PushButton("Export Selected", self)
         self.btn_export.setEnabled(False)  # Disabled until checkbox checked
         self.btn_export.clicked.connect(self.export_solution)
 
-        # Keep buttons compact, but make validation actions a bit wider for labels.
-        self.btn_validate.setMinimumWidth(170)
-        self.btn_validate.setMaximumWidth(210)
-        self.btn_validate.setFixedHeight(30)
-        self.btn_validate.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-
-        self.btn_param_validate.setMinimumWidth(170)
-        self.btn_param_validate.setMaximumWidth(210)
-        self.btn_param_validate.setFixedHeight(30)
-        self.btn_param_validate.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-
-        self.btn_export.setMinimumWidth(120)
-        self.btn_export.setMaximumWidth(150)
-        self.btn_export.setFixedHeight(30)
-        self.btn_export.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-
         header_layout.addWidget(self.title)
         header_layout.addStretch(1)
-        header_layout.addWidget(self.btn_validate)
-        header_layout.addWidget(self.btn_param_validate)
         header_layout.addWidget(self.btn_export)
 
         self.table = TableWidget(self)
@@ -178,8 +150,6 @@ class ResultsWidget(QWidget):
         self.update_table(gui_data)
         self.btn_export.setEnabled(False)
         self.btn_export.setText("Export Selected")
-        self.btn_validate.setVisible(False)
-        self.btn_param_validate.setVisible(False)
 
     def on_item_changed(self, item: QTableWidgetItem):
         """Keep export button state in sync when item-based checkbox changes."""
@@ -264,9 +234,6 @@ class ResultsWidget(QWidget):
                 duration=5000,
                 parent=self.window(),
             )
-            if success_count > 0:
-                self.btn_validate.setVisible(True)
-                self.btn_param_validate.setVisible(True)
         except Exception as e:
             import traceback
             traceback.print_exc()
