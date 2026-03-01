@@ -72,7 +72,7 @@ class SettingsPage(QWidget):
         self.line_path = LineEdit(self)
         self.line_path.setReadOnly(True)
         
-        self.default_path = os.path.expanduser("~/Downloads")
+        self.default_path = self._default_user_dir()
         self.line_path.setText(self.default_path)
         
         self.btn_browse = PushButton("Browse", self)
@@ -146,6 +146,12 @@ class SettingsPage(QWidget):
         }
         
         layout.addStretch()
+
+    @staticmethod
+    def _default_user_dir() -> str:
+        """Prefer Downloads; fall back to user home if Downloads doesn't exist."""
+        downloads = os.path.normpath(os.path.join(os.path.expanduser("~"), "Downloads"))
+        return downloads if os.path.isdir(downloads) else os.path.expanduser("~")
 
     def toggle_path_mode(self, checked):
         """Enable or disable the browse button based on the switch state."""

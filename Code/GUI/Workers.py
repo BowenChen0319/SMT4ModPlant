@@ -47,7 +47,7 @@ class SMTWorker(QThread):
             ]
             
             if not resource_files:
-                raise FileNotFoundError("No .xml or .aasx files found in the selected directory.")
+                raise FileNotFoundError("No .xml, .aasx, or .json files found in the selected directory.")
 
             all_capabilities = {}
             total_files = len(resource_files)

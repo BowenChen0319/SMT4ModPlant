@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('/Users/bowen/PycharmProjects/SMT4ModPlant/Code/GUI/rwth_logo.png', 'Code/GUI')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('qfluentwidgets')
@@ -11,7 +11,7 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['gui_main.py'],
+    ['/Users/bowen/PycharmProjects/SMT4ModPlant/gui_main.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -41,7 +41,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['Others/logo.icns'],
+    icon=['/Users/bowen/PycharmProjects/SMT4ModPlant/Others/logo.icns'],
 )
 coll = COLLECT(
     exe,
@@ -55,6 +55,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='SMT4ModPlant.app',
-    icon='Others/logo.icns',
+    icon='/Users/bowen/PycharmProjects/SMT4ModPlant/Others/logo.icns',
     bundle_identifier=None,
 )

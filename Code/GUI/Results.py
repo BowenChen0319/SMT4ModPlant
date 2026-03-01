@@ -1,5 +1,6 @@
 # Code/GUI/Results.py
 import os
+import sys
 from typing import List, Dict, Optional
 
 from PyQt6.QtCore import Qt
@@ -100,6 +101,18 @@ class ResultsWidget(QWidget):
         layout.addLayout(header_layout)
         layout.addWidget(self.table, 1)
 
+    @staticmethod
+    def _default_user_dir() -> str:
+        """Prefer Downloads; fall back to user home if Downloads doesn't exist."""
+        downloads = os.path.normpath(os.path.join(os.path.expanduser("~"), "Downloads"))
+        return downloads if os.path.isdir(downloads) else os.path.expanduser("~")
+
+    @staticmethod
+    def _program_dir() -> str:
+        """Return the directory where the application/script is located."""
+        program_path = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else os.getcwd()
+        return os.path.dirname(program_path)
+
     # -------------------------
     # Styling sync (export button)
     # -------------------------
@@ -178,13 +191,14 @@ class ResultsWidget(QWidget):
                 save_dir = ""
 
         if not save_dir:
-            save_dir = os.path.expanduser("~/Downloads")
+            save_dir = self._default_user_dir()
+        save_dir = os.path.normpath(save_dir)
 
         if not os.path.exists(save_dir):
             try:
                 os.makedirs(save_dir)
             except Exception:
-                save_dir = os.path.expanduser("~/Downloads")
+                save_dir = self._default_user_dir()
 
         success_count = 0
         try:
@@ -241,7 +255,7 @@ class ResultsWidget(QWidget):
     # =========================
     def validate_master_recipe(self):
         main = self.window()
-        start_dir = os.path.expanduser("~/Downloads")
+        start_dir = self._default_user_dir()
         options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
@@ -264,7 +278,7 @@ class ResultsWidget(QWidget):
         schema_dir = QFileDialog.getExistingDirectory(
             self,
             "Validate Master Recipe - Step 2/2: Select the folder that contains XSD schema files",
-            start_dir,
+            self._program_dir(),
             options=options,
         )
         if not schema_dir:
@@ -333,7 +347,7 @@ class ResultsWidget(QWidget):
     # =========================
     def validate_parameters(self):
         main = self.window()
-        start_dir = os.path.expanduser("~/Downloads")
+        start_dir = self._default_user_dir()
         options = QFileDialog.Option.DontUseNativeDialog
         if hasattr(main, "settings_page"):
             try:
@@ -383,16 +397,16 @@ class ResultsWidget(QWidget):
 
             resource_dir = QFileDialog.getExistingDirectory(
                 self,
-                "Parameter Validation - Step 2: Select the resource folder (AAS XML/AASX)",
+                "Parameter Validation - Step 2: Select the resource folder (AAS XML/AASX/JSON)",
                 start_dir,
                 options=options,
             )
             if not resource_dir:
                 return
-            if not any(name.lower().endswith((".xml", ".aasx")) for name in os.listdir(resource_dir)):
+            if not any(name.lower().endswith((".xml", ".aasx", ".json")) for name in os.listdir(resource_dir)):
                 InfoBar.error(
                     title="Parameter Validation Error",
-                    content="Selected folder does not contain any .xml or .aasx files.",
+                    content="Selected folder does not contain any .xml, .aasx, or .json files.",
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP_RIGHT,
@@ -405,7 +419,7 @@ class ResultsWidget(QWidget):
             resources_data = {}
             try:
                 for fn in os.listdir(resource_dir):
-                    if not (fn.lower().endswith(".xml") or fn.lower().endswith(".aasx")):
+                    if not fn.lower().endswith((".xml", ".aasx", ".json")):
                         continue
                     full = os.path.join(resource_dir, fn)
                     res_name = os.path.splitext(fn)[0]

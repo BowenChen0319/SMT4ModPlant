@@ -4,6 +4,13 @@ import sys
 import os
 # ... (Imports and Bundle Fixes stay same) ...
 
+# % pyinstaller --noconsole --name="SMT4ModPlant" --clean \                                          
+#  --collect-all qfluentwidgets \
+#  --collect-all z3 \
+#  --icon="Others/logo.icns" \
+#  gui_main.py
+
+
 # PyQt6 Imports
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import (

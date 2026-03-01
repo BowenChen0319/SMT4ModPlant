@@ -1,5 +1,6 @@
 # Code/GUI/Home.py
 import os
+import sys
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
@@ -25,7 +26,7 @@ class HomePage(QWidget):
         # --- Variables ---
         self.recipe_path = ""
         self.resource_dir = ""
-        self.default_export_path = os.path.normpath(os.path.expanduser("~/Downloads"))
+        self.default_export_path = self._default_user_dir()
         self.current_export_path = self.default_export_path
         self.mode_index = 0
         self.prev_vals = {}
@@ -39,6 +40,16 @@ class HomePage(QWidget):
     def _get_logo_path(self):
         """Return absolute path of the RWTH logo image in this package."""
         return os.path.join(os.path.dirname(__file__), "rwth_logo.png")
+
+    def _default_user_dir(self):
+        """Prefer Downloads; fall back to user home if Downloads doesn't exist."""
+        downloads = os.path.normpath(os.path.join(os.path.expanduser("~"), "Downloads"))
+        return downloads if os.path.isdir(downloads) else os.path.expanduser("~")
+
+    def _program_dir(self):
+        """Return the directory where the application/script is located."""
+        program_path = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] else os.getcwd()
+        return os.path.dirname(program_path)
         
     def init_ui(self):
         """Build the overall two-panel layout and wire initial UI components."""
@@ -408,7 +419,7 @@ class HomePage(QWidget):
     def select_recipe(self):
         """Prompt for a General Recipe XML file and update state."""
         options = QFileDialog.Option.DontUseNativeDialog
-        start_dir = os.path.expanduser("~/Downloads")
+        start_dir = self._program_dir()
         f, _ = QFileDialog.getOpenFileName(
             self,
             "Select Recipe XML",
@@ -424,7 +435,7 @@ class HomePage(QWidget):
     def select_folder(self):
         """Prompt for the resources directory and update state."""
         options = QFileDialog.Option.DontUseNativeDialog
-        start_dir = os.path.expanduser("~/Downloads")
+        start_dir = self._program_dir()
         d = QFileDialog.getExistingDirectory(
             self,
             "Select Resources Folder",
