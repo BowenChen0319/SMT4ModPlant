@@ -3,13 +3,22 @@ import sys
 from typing import Dict, Optional
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QSizePolicy
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFileDialog,
+    QSizePolicy,
+    QFrame,
+    QScrollArea,
+)
 
 from qfluentwidgets import (
     CardWidget,
     IconWidget,
     SubtitleLabel,
     BodyLabel,
+    CaptionLabel,
     PushButton,
     FluentIcon,
     InfoBar,
@@ -17,7 +26,7 @@ from qfluentwidgets import (
 )
 
 from Code.Transformator.MasterRecipeValidator import (
-    validate_master_recipe_xml,
+    validate_master_recipe_xml_detailed,
     validate_master_recipe_parameters,
 )
 
@@ -96,7 +105,52 @@ class RecipeValidatorPage(QWidget):
         status_layout.addWidget(self.status_dot, 0, Qt.AlignmentFlag.AlignVCenter)
         status_layout.addWidget(self.status_text, 1)
         layout.addWidget(status_card)
-        layout.addStretch(1)
+
+        self.details_card = CardWidget(self)
+        self.details_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        details_layout = QVBoxLayout(self.details_card)
+        details_layout.setContentsMargins(20, 18, 20, 18)
+        details_layout.setSpacing(12)
+        details_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        details_header = QVBoxLayout()
+        details_header.setContentsMargins(0, 0, 0, 0)
+        details_header.setSpacing(2)
+        details_header.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.details_title = SubtitleLabel("Validation Details", self)
+        self.details_title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.details_title.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.details_hint = CaptionLabel("All validation issues will appear here when a check fails.", self)
+        self.details_hint.setStyleSheet("color: #8A8A8A;")
+        self.details_hint.setWordWrap(True)
+        self.details_hint.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.details_hint.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_header.addWidget(self.details_title)
+        details_header.addWidget(self.details_hint)
+        details_layout.addLayout(details_header)
+
+        self.details_scroll = QScrollArea(self)
+        self.details_scroll.setWidgetResizable(True)
+        self.details_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.details_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.details_scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.details_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+
+        self.details_container = QWidget(self)
+        self.details_container.setStyleSheet("background: transparent;")
+        self.details_list_layout = QVBoxLayout(self.details_container)
+        self.details_list_layout.setContentsMargins(0, 0, 0, 0)
+        self.details_list_layout.setSpacing(10)
+        self.details_scroll.setWidget(self.details_container)
+        self.details_scroll.hide()
+        details_layout.addWidget(self.details_scroll, 1)
+
+        layout.addWidget(self.details_card, 1)
+        self._show_validation_issues(
+            title="Validation Details",
+            hint="All validation issues will appear here when a check fails.",
+            issues=[],
+        )
 
     def set_context_data(self, context_data: Optional[Dict]):
         """Receive latest calculation context from Home page."""
@@ -152,6 +206,170 @@ class RecipeValidatorPage(QWidget):
         self.status_dot.setStyleSheet(f"color: {color}; font-size: 18px;")
         self.status_text.setText(text)
 
+    def _clear_validation_issue_widgets(self):
+        while self.details_list_layout.count():
+            item = self.details_list_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _build_issue_card(self, issue: Dict, index: int) -> QFrame:
+        card = QFrame(self.details_container)
+        card.setObjectName("validationIssueCard")
+        card.setStyleSheet(
+            """
+            QFrame#validationIssueCard {
+                background-color: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 14px;
+            }
+            """
+        )
+
+        outer = QHBoxLayout(card)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        accent = QFrame(card)
+        accent.setFixedWidth(5)
+        accent.setStyleSheet("background-color: #D13438; border-top-left-radius: 14px; border-bottom-left-radius: 14px;")
+        outer.addWidget(accent)
+
+        content_wrap = QWidget(card)
+        content_wrap.setStyleSheet("background: transparent;")
+        content = QVBoxLayout(content_wrap)
+        content.setContentsMargins(16, 14, 16, 14)
+        content.setSpacing(6)
+
+        badge = CaptionLabel(f"Issue {index:02d}", content_wrap)
+        badge.setStyleSheet(
+            "color: #FDE7E9; background-color: rgba(209, 52, 56, 0.22); "
+            "border: 1px solid rgba(209, 52, 56, 0.45); border-radius: 10px; padding: 2px 8px;"
+        )
+        badge.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        content.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
+
+        title = BodyLabel(issue.get("title") or "Validation issue", content_wrap)
+        title.setWordWrap(True)
+        title.setStyleSheet("font-size: 14px; font-weight: 600;")
+        content.addWidget(title)
+
+        location_text = issue.get("location") or "Unknown location"
+        location = CaptionLabel(location_text, content_wrap)
+        location.setWordWrap(True)
+        location.setStyleSheet("color: #8A8A8A;")
+        content.addWidget(location)
+
+        reason = BodyLabel(issue.get("reason") or issue.get("message") or "", content_wrap)
+        reason.setWordWrap(True)
+        reason.setStyleSheet("color: #F3F3F3;")
+        content.addWidget(reason)
+
+        extra = issue.get("extra") or ""
+        if extra:
+            extra_label = CaptionLabel(extra, content_wrap)
+            extra_label.setWordWrap(True)
+            extra_label.setStyleSheet("color: #B9B9B9;")
+            content.addWidget(extra_label)
+
+        outer.addWidget(content_wrap, 1)
+        return card
+
+    def _show_validation_issues(self, title: str, hint: str, issues: list[Dict]):
+        self.details_title.setText(title)
+        self.details_hint.setText(hint)
+        self._clear_validation_issue_widgets()
+
+        has_issues = len(issues) > 0
+        self.details_scroll.setVisible(has_issues)
+
+        if not has_issues:
+            return
+
+        for index, issue in enumerate(issues, start=1):
+            self.details_list_layout.addWidget(self._build_issue_card(issue, index))
+        self.details_list_layout.addStretch(1)
+
+    @staticmethod
+    def _normalize_issue_text(value) -> str:
+        return str(value).strip() if value is not None else ""
+
+    def _build_xsd_issue_items(self, details: list[Dict], errors: list[str]) -> list[Dict]:
+        issues: list[Dict] = []
+
+        for detail in details:
+            message = self._normalize_issue_text(detail.get("message"))
+            location = self._normalize_issue_text(detail.get("location")) or "Schema validation"
+            path = self._normalize_issue_text(detail.get("path"))
+            type_name = self._normalize_issue_text(detail.get("type_name"))
+
+            extra_parts = []
+            if path:
+                extra_parts.append(f"XPath: {path}")
+            if type_name:
+                extra_parts.append(f"Type: {type_name}")
+
+            issues.append({
+                "title": location,
+                "location": "Master Recipe XML",
+                "reason": message or "Schema validation failed.",
+                "extra": " | ".join(extra_parts),
+            })
+
+        if issues:
+            return issues
+
+        for err in errors:
+            issues.append({
+                "title": "Schema validation error",
+                "location": "Master Recipe XML",
+                "reason": self._normalize_issue_text(err),
+            })
+        return issues
+
+    def _build_parameter_issue_items(self, details: list[Dict], errors: list[str]) -> list[Dict]:
+        issues: list[Dict] = []
+        for detail in details:
+            status = detail.get("status")
+            if status not in {"INVALID_PREFIX", "INVALID_ID", "UNKNOWN_UUID"}:
+                continue
+
+            desc = self._normalize_issue_text(detail.get("description")) or "Unnamed parameter"
+            raw_id = self._normalize_issue_text(detail.get("raw_id"))
+            uuid = self._normalize_issue_text(detail.get("uuid"))
+            location = self._normalize_issue_text(detail.get("location")) or desc
+
+            if status == "INVALID_PREFIX":
+                reason = "The ID prefix is outside the allowed range."
+            elif status == "INVALID_ID":
+                reason = "The parameter ID could not be parsed as a valid UUID or OPC UA GUID."
+            else:
+                reason = "The UUID does not exist in the parsed AAS capability set."
+
+            extra_parts = []
+            if raw_id:
+                extra_parts.append(f"ID: {raw_id}")
+            if uuid:
+                extra_parts.append(f"UUID: {uuid}")
+
+            issues.append({
+                "title": desc,
+                "location": location,
+                "reason": reason,
+                "extra": " | ".join(extra_parts),
+            })
+
+        if issues:
+            return issues
+
+        for err in errors:
+            issues.append({
+                "title": "Parameter validation error",
+                "location": "Master Recipe Parameter",
+                "reason": self._normalize_issue_text(err),
+            })
+        return issues
+
     def validate_master_recipe(self):
         main = self.window()
         start_dir = self._default_user_dir()
@@ -190,10 +408,19 @@ class RecipeValidatorPage(QWidget):
             return
 
         try:
-            ok, errors, used_root = validate_master_recipe_xml(xml_path, schema_dir, root_xsd_path=None)
+            ok, errors, used_root, error_details = validate_master_recipe_xml_detailed(
+                xml_path,
+                schema_dir,
+                root_xsd_path=None,
+            )
 
             if ok:
                 self._set_status(True, f"Validate Master Recipe Passed (Root XSD: {os.path.basename(used_root or '')})")
+                self._show_validation_issues(
+                    title="Validation Details",
+                    hint="No XML schema issues were detected in the selected Master Recipe.",
+                    issues=[],
+                )
                 InfoBar.success(
                     title="Validation Passed",
                     content=f"XML conforms to XSD (root: {os.path.basename(used_root or '')})",
@@ -207,7 +434,12 @@ class RecipeValidatorPage(QWidget):
 
             preview = " | ".join(errors[:2])
             more = "" if len(errors) <= 2 else f" (+{len(errors) - 2} more)"
-            self._set_status(False, f"Validate Master Recipe failed: {preview}{more}")
+            self._set_status(False, f"Validate Master Recipe failed ({len(errors)} errors)")
+            self._show_validation_issues(
+                title=f"Schema Issues ({len(errors)})",
+                hint="Each item shows where the XML schema check failed and why.",
+                issues=self._build_xsd_issue_items(error_details, errors),
+            )
             InfoBar.error(
                 title="Validation Failed",
                 content=f"{preview}{more}",
@@ -219,6 +451,15 @@ class RecipeValidatorPage(QWidget):
             )
         except Exception as e:
             self._set_status(False, f"Validate Master Recipe error: {e}")
+            self._show_validation_issues(
+                title="Validation Error",
+                hint="The schema validation run ended with an exception.",
+                issues=[{
+                    "title": "Unexpected validation error",
+                    "location": "Recipe Validator",
+                    "reason": str(e),
+                }],
+            )
             InfoBar.error(
                 title="Validation Error",
                 content=str(e),
@@ -337,6 +578,14 @@ class RecipeValidatorPage(QWidget):
 
             if ok:
                 self._set_status(True, f"Parameter Validierung passed: all {checked} parameters matched.")
+                hint = "All parameters matched the parsed AAS capability data."
+                if warnings:
+                    hint = f"{hint} Warnings: {len(warnings)}."
+                self._show_validation_issues(
+                    title="Parameter Details",
+                    hint=hint,
+                    issues=[],
+                )
                 InfoBar.success(
                     title="Parameter Validation Passed",
                     content=f"All {checked} parameters matched parsed AAS capabilities.",
@@ -349,7 +598,12 @@ class RecipeValidatorPage(QWidget):
             else:
                 preview = " | ".join(errors[:2])
                 more = "" if len(errors) <= 2 else f" (+{len(errors) - 2} more)"
-                self._set_status(False, f"Parameter Validierung failed: {preview}{more}")
+                self._set_status(False, f"Parameter Validierung failed ({len(errors)} errors)")
+                self._show_validation_issues(
+                    title=f"Parameter Issues ({len(errors)})",
+                    hint="Each item shows the failing parameter, its location, and the reason.",
+                    issues=self._build_parameter_issue_items(details, errors),
+                )
                 InfoBar.error(
                     title="Parameter Validation Failed",
                     content=f"{preview}{more}",
@@ -361,6 +615,15 @@ class RecipeValidatorPage(QWidget):
                 )
         except Exception as e:
             self._set_status(False, f"Parameter Validierung error: {e}")
+            self._show_validation_issues(
+                title="Parameter Validation Error",
+                hint="The parameter validation run ended with an exception.",
+                issues=[{
+                    "title": "Unexpected validation error",
+                    "location": "Recipe Validator",
+                    "reason": str(e),
+                }],
+            )
             InfoBar.error(
                 title="Parameter Validation Error",
                 content=str(e),

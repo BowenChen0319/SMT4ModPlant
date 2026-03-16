@@ -36,27 +36,88 @@ def validate_master_recipe_xml(
 
     Returns: (ok, errors, used_root_xsd_path)
     """
+    ok, errors, used_root, _ = validate_master_recipe_xml_detailed(
+        master_recipe_xml_path,
+        allschema_dir,
+        root_xsd_path=root_xsd_path,
+    )
+    return ok, errors, used_root
+
+
+def _schema_error_to_detail(err) -> dict:
+    line = getattr(err, "line", None)
+    column = getattr(err, "column", None)
+    path = getattr(err, "path", None)
+    filename = getattr(err, "filename", None)
+    message = getattr(err, "message", None) or str(err)
+
+    return {
+        "kind": "XSD_ERROR",
+        "line": int(line) if isinstance(line, int) and line > 0 else None,
+        "column": int(column) if isinstance(column, int) and column >= 0 else None,
+        "path": path or "",
+        "filename": filename or "",
+        "message": message.strip(),
+        "level_name": getattr(err, "level_name", "") or "",
+        "domain_name": getattr(err, "domain_name", "") or "",
+        "type_name": getattr(err, "type_name", "") or "",
+        "location": (
+            f"Line {line}, Column {column}"
+            if isinstance(line, int) and line > 0 and isinstance(column, int) and column >= 0
+            else f"Line {line}"
+            if isinstance(line, int) and line > 0
+            else path or filename or "Unknown location"
+        ),
+    }
+
+
+def validate_master_recipe_xml_detailed(
+    master_recipe_xml_path: str,
+    allschema_dir: str,
+    root_xsd_path: str | None = None
+) -> tuple[bool, list[str], str | None, list[dict]]:
+    """
+    Returns:
+      ok(bool), errors(list[str]), used_root_xsd_path(str|None), details(list[dict])
+    """
     used_root = root_xsd_path or _guess_root_xsd(allschema_dir)
     if not used_root:
-        return False, [f"[XSD] No .xsd found under: {allschema_dir}"], None
+        msg = f"[XSD] No .xsd found under: {allschema_dir}"
+        return False, [msg], None, [{
+            "kind": "XSD_SETUP_ERROR",
+            "message": msg,
+            "location": allschema_dir,
+        }]
 
     try:
         xml_doc = etree.parse(str(master_recipe_xml_path))
     except Exception as e:
-        return False, [f"[XML] Failed to parse XML: {e}"], used_root
+        msg = f"[XML] Failed to parse XML: {e}"
+        return False, [msg], used_root, [{
+            "kind": "XML_PARSE_ERROR",
+            "message": str(e),
+            "location": master_recipe_xml_path,
+        }]
 
     try:
         xsd_doc = etree.parse(str(used_root))
         schema = etree.XMLSchema(xsd_doc)
     except Exception as e:
-        return False, [f"[XSD] Failed to parse XSD ({used_root}): {e}"], used_root
+        msg = f"[XSD] Failed to parse XSD ({used_root}): {e}"
+        return False, [msg], used_root, [{
+            "kind": "XSD_PARSE_ERROR",
+            "message": str(e),
+            "location": used_root,
+        }]
 
     ok = schema.validate(xml_doc)
     errors: list[str] = []
+    details: list[dict] = []
     if not ok:
         for err in schema.error_log:
             errors.append(f"[XSD] {err}")
-    return ok, errors, used_root
+            details.append(_schema_error_to_detail(err))
+    return ok, errors, used_root, details
 
 
 # ==========================================================
@@ -379,12 +440,18 @@ def validate_master_recipe_parameters(
         allowed_numeric_prefixes = tuple(f"{i:03d}" for i in range(1, 51))
     allowed_prefix_set = set(allowed_numeric_prefixes or ())
 
-    for p in params:
+    for index, p in enumerate(params, start=1):
         desc_el = p.find('./{*}Description')
         desc = (desc_el.text or "").strip() if desc_el is not None else ""
 
         id_el = p.find('./{*}ID')
         raw_id = (id_el.text or "").strip() if id_el is not None else ""
+        line = p.sourceline if isinstance(getattr(p, "sourceline", None), int) else None
+        location = f"Parameter #{index}"
+        if line:
+            location += f" (line {line})"
+        if desc:
+            location += f" - {desc}"
 
         numeric_prefix = None
         if enforce_numeric_prefixes and raw_id:
@@ -399,6 +466,9 @@ def validate_master_recipe_parameters(
                         "raw_id": raw_id,
                         "prefix": numeric_prefix,
                         "allowed_prefixes": list(allowed_numeric_prefixes or ()),
+                        "parameter_index": index,
+                        "line": line,
+                        "location": location,
                     })
                     continue
 
@@ -415,6 +485,9 @@ def validate_master_recipe_parameters(
                 "status": "INVALID_ID",
                 "description": desc,
                 "raw_id": raw_id,
+                "parameter_index": index,
+                "line": line,
+                "location": location,
             })
             continue
 
@@ -426,6 +499,9 @@ def validate_master_recipe_parameters(
                 "raw_id": raw_id,
                 "uuid": uuid,
                 "prefix": numeric_prefix,
+                "parameter_index": index,
+                "line": line,
+                "location": location,
             })
             continue
 
@@ -469,6 +545,9 @@ def validate_master_recipe_parameters(
             "raw_id": raw_id,
             "uuid": uuid,
             "prefix": numeric_prefix,
+            "parameter_index": index,
+            "line": line,
+            "location": location,
             "resource_key": hit.get("resource_key"),
             "resource": hit.get("resource"),
             "capability_name": hit.get("capability_name"),
