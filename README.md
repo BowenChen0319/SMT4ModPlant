@@ -36,6 +36,28 @@ The repository already contains sample files for quick testing:
 
 ## 🛠️ Installation
 
+### Prebuilt Executables
+
+Prebuilt executable packages are available as **`Windows.zip`** and **`Mac.zip`**.
+
+After extracting the archive, the application is ready to use.
+
+For the macOS version, due to the operating system security mechanism for unsigned applications, you need to run the following command in Terminal before opening the app:
+
+```bash
+sudo xattr -rd com.apple.quarantine 
+```
+
+Please note that there is a trailing space at the end of the command above. Then drag **`PlantConfigurator.app`** into the Terminal window, and the application path will be filled in automatically.
+
+The full command will look like this:
+
+```bash
+sudo xattr -rd com.apple.quarantine <Path To PlantConfigurator.app>
+```
+
+Replace **`<Path To PlantConfigurator.app>`** with your actual path to **`PlantConfigurator.app`**.
+
 ### Prerequisites
 
 * **Python 3.10+**
