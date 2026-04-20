@@ -21,9 +21,9 @@ from qfluentwidgets import (
     CaptionLabel,
     PushButton,
     FluentIcon,
-    InfoBar,
     InfoBarPosition,
 )
+from Code.GUI.Notifications import SafeInfoBar as InfoBar
 
 from Code.Transformator.MasterRecipeValidator import (
     validate_master_recipe_xml_detailed,
@@ -201,6 +201,18 @@ class RecipeValidatorPage(QWidget):
                 return dirs[0]
         return ""
 
+    def _get_preferred_export_dir(self) -> str:
+        """Resolve the export directory from the main window, with fallback."""
+        main = self.window()
+        if hasattr(main, "get_export_path"):
+            try:
+                export_dir = main.get_export_path()
+                if export_dir:
+                    return os.path.normpath(export_dir)
+            except Exception:
+                pass
+        return self._default_user_dir()
+
     def _set_status(self, ok: bool, text: str):
         color = "#107C10" if ok else "#D13438"
         self.status_dot.setStyleSheet(f"color: {color}; font-size: 18px;")
@@ -371,15 +383,9 @@ class RecipeValidatorPage(QWidget):
         return issues
 
     def validate_master_recipe(self):
-        main = self.window()
-        start_dir = self._default_user_dir()
-        if hasattr(main, "settings_page"):
-            try:
-                d = main.settings_page.get_export_path()
-                if d and os.path.isdir(d):
-                    start_dir = d
-            except Exception:
-                pass
+        start_dir = self._get_preferred_export_dir()
+        if not os.path.isdir(start_dir):
+            start_dir = self._default_user_dir()
 
         xml_path = self._open_file_dialog(
             title="Validate Master Recipe - Step 1/2: Select Master Recipe XML",
@@ -470,15 +476,9 @@ class RecipeValidatorPage(QWidget):
             )
 
     def validate_parameters(self):
-        main = self.window()
-        start_dir = self._default_user_dir()
-        if hasattr(main, "settings_page"):
-            try:
-                d = main.settings_page.get_export_path()
-                if d and os.path.isdir(d):
-                    start_dir = d
-            except Exception:
-                pass
+        start_dir = self._get_preferred_export_dir()
+        if not os.path.isdir(start_dir):
+            start_dir = self._default_user_dir()
 
         def _has_usable_resources(data) -> bool:
             if not isinstance(data, dict) or not data:

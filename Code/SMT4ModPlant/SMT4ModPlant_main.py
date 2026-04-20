@@ -115,6 +115,60 @@ def properties_compatible(recipe_step, cap_entry):
             return False, []
     return True, matched_props
 
+
+def _summarize_matched_properties(matched_props):
+    """Convert raw (param, property) pairs into a JSON-friendly debug structure."""
+    summary = []
+    for param, prop in matched_props:
+        summary.append({
+            "parameter_id": param.get("ID"),
+            "parameter_description": param.get("Description"),
+            "parameter_key": param.get("Key"),
+            "parameter_unit": param.get("UnitOfMeasure"),
+            "parameter_value": param.get("ValueString"),
+            "property_id": prop.get("property_ID"),
+            "property_name": prop.get("property_name"),
+            "property_unit": prop.get("property_unit"),
+            "value_min": prop.get("valueMin"),
+            "value_max": prop.get("valueMax"),
+        })
+    return summary
+
+
+def _analyze_capability_match(recipe_data, step, cap_entry):
+    """
+    Evaluate one capability against one recipe step and return debug details.
+
+    Returns:
+        debug_entry: dict describing semantic/property/precondition checks
+        matched_props_local: list[(param, prop)] for successful property matches
+    """
+    sem_id = step.get("SemanticDescription", "")
+    cap_meta = (cap_entry.get("capability") or [{}])[0]
+    cap_name = cap_meta.get("capability_name", "Unknown")
+    cap_id = cap_meta.get("capability_ID", "")
+
+    semantic_match = capability_matching(sem_id, cap_entry)
+    properties_match = False
+    preconditions_match = False
+    matched_props_local = []
+
+    if semantic_match:
+        properties_match, matched_props_local = properties_compatible(step, cap_entry)
+
+    if semantic_match and properties_match:
+        preconditions_match = check_preconditions_for_step(recipe_data, step, cap_entry)
+
+    debug_entry = {
+        "capability_name": cap_name,
+        "capability_id": cap_id,
+        "semantic_match": semantic_match,
+        "properties_match": properties_match,
+        "preconditions_match": preconditions_match,
+        "matched_properties": _summarize_matched_properties(matched_props_local),
+    }
+    return debug_entry, matched_props_local
+
 def check_preconditions_for_step(recipe, step, cap_entry):
     step_id = step['ID']
     links = recipe.get('DirectedLinks', [])
@@ -333,32 +387,30 @@ def _match_step_to_resource_caps(
     Returns:
         matching_caps: list[str]  - capability names that match this step
         matching_props: list[tuple[str, dict]] - (capability_name, matched_props_local)
+        capability_debug: list[dict] - capability-by-capability diagnostics
     """
-    sem_id = step.get("SemanticDescription", "")
     cap_list = capabilities_data[res]
 
     matching_caps = []
     matching_props = []
+    capability_debug = []
 
     for cap_entry in cap_list:
-        # Semantic match (robust logic is implemented in capability_matching)
-        if not capability_matching(sem_id, cap_entry):
+        cap_debug, matched_props_local = _analyze_capability_match(recipe_data, step, cap_entry)
+        capability_debug.append(cap_debug)
+
+        if not cap_debug["semantic_match"]:
+            continue
+        if not cap_debug["properties_match"]:
+            continue
+        if not cap_debug["preconditions_match"]:
             continue
 
-        # Property/value/unit matching between recipe step and capability
-        is_prop_match, matched_props_local = properties_compatible(step, cap_entry)
-        if not is_prop_match:
-            continue
-
-        # Preconditions (e.g., required upstream results, constraints, etc.)
-        if not check_preconditions_for_step(recipe_data, step, cap_entry):
-            continue
-
-        cap_name = cap_entry["capability"][0]["capability_name"]
+        cap_name = cap_debug["capability_name"]
         matching_caps.append(cap_name)
         matching_props.append((cap_name, matched_props_local))
 
-    return matching_caps, matching_props
+    return matching_caps, matching_props, capability_debug
 
 
 def _build_model_and_assignments(
@@ -377,18 +429,20 @@ def _build_model_and_assignments(
         solver: z3.Solver
         Assignment: 2D list of Bool or None (None means impossible assignment)
         step_resource_to_caps_props: 2D list storing (matching_caps, matching_props)
+        matching_debug: list[dict] storing per-step/per-resource debug data
     """
     solver = Solver()
     step_by_id = {step["ID"]: idx for idx, step in enumerate(process_steps)}
 
     step_resource_to_caps_props = [[[] for _ in resources] for _ in process_steps]
     Assignment = []
+    matching_debug = []
 
     for i, step in enumerate(process_steps):
         row = []
 
         for j, res in enumerate(resources):
-            matching_caps, matching_props = _match_step_to_resource_caps(
+            matching_caps, matching_props, capability_debug = _match_step_to_resource_caps(
                 recipe_data=recipe_data,
                 step=step,
                 res=res,
@@ -406,12 +460,28 @@ def _build_model_and_assignments(
             )
             transfer_cap = has_transfer_capability(res, capabilities_data)
 
-            valid = True
+            invalid_reasons = []
             if transfer_needed and not transfer_cap:
-                valid = False
+                invalid_reasons.append("transfer_required_but_capability_missing")
             if not matching_caps:
-                # No compatible capability found on this resource for this step.
-                valid = False
+                invalid_reasons.append("no_capability_match")
+
+            valid = len(invalid_reasons) == 0
+
+            matching_debug.append({
+                "step_index": i,
+                "step_id": step.get("ID"),
+                "step_description": step.get("Description"),
+                "step_semantic_description": step.get("SemanticDescription"),
+                "resource_index": j,
+                "resource": res,
+                "transfer_needed": transfer_needed,
+                "transfer_capability_available": transfer_cap,
+                "candidate_valid": valid,
+                "invalid_reasons": invalid_reasons,
+                "matched_capabilities": matching_caps,
+                "capability_checks": capability_debug,
+            })
 
             if valid:
                 step_resource_to_caps_props[i][j] = (matching_caps, matching_props)
@@ -423,7 +493,7 @@ def _build_model_and_assignments(
 
         Assignment.append(row)
 
-    return solver, Assignment, step_resource_to_caps_props
+    return solver, Assignment, step_resource_to_caps_props, matching_debug
 
 
 def _add_exactly_one_resource_per_step_constraints(solver, Assignment):
@@ -500,7 +570,7 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
         find_all_solutions: If True, enumerate all solutions (with blocking clauses)
 
     Returns:
-        (gui_results_list, all_solutions_json_list)
+        (gui_results_list, all_solutions_json_list, debug_payload)
     """
     process_steps = recipe_data["ProcessElements"]
     resources = list(capabilities_data.keys())
@@ -508,7 +578,7 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
     log_callback(f"Starting optimization (Find All: {find_all_solutions})...")
 
     # 1) Build model + assignment variables with early pruning rules.
-    solver, Assignment, step_resource_to_caps_props = _build_model_and_assignments(
+    solver, Assignment, step_resource_to_caps_props, matching_debug = _build_model_and_assignments(
         recipe_data=recipe_data,
         capabilities_data=capabilities_data,
         process_steps=process_steps,
@@ -517,6 +587,14 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
 
     # 2) Add core "exactly one resource per step" constraints.
     _add_exactly_one_resource_per_step_constraints(solver, Assignment)
+
+    try:
+        smt_model = solver.to_smt2()
+    except Exception:
+        try:
+            smt_model = solver.sexpr()
+        except Exception:
+            smt_model = ""
 
     log_callback("Solving constraints...")
 
@@ -570,4 +648,11 @@ def run_optimization(recipe_data, capabilities_data, log_callback=print, generat
     else:
         log_callback(f"Search finished. Found {valid_solution_count} valid solution(s).")
 
-    return all_results_for_gui, all_json_solutions
+    debug_payload = {
+        "smt_model": smt_model,
+        "matching_debug": matching_debug,
+        "step_count": len(process_steps),
+        "resource_count": len(resources),
+    }
+
+    return all_results_for_gui, all_json_solutions, debug_payload

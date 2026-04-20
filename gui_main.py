@@ -14,8 +14,10 @@ import os
 # PyQt6 Imports
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import (
-    FluentWindow, NavigationItemPosition, FluentIcon, setTheme, Theme
+    FluentWindow, NavigationItemPosition, FluentIcon, setTheme, Theme,
+    InfoBarPosition
 )
+from Code.GUI.Notifications import SafeInfoBar as InfoBar
 
 try:
     from Code.GUI.Home import HomePage
@@ -51,9 +53,47 @@ class MainWindow(FluentWindow):
         
         self.switchTo(self.home_page)
 
+    def get_export_path(self):
+        """Return the active export path selected in the current UI."""
+        if hasattr(self, "home_page") and hasattr(self.home_page, "get_export_path"):
+            try:
+                return self.home_page.get_export_path()
+            except Exception:
+                pass
+
+        if hasattr(self, "settings_page") and hasattr(self.settings_page, "get_export_path"):
+            try:
+                return self.settings_page.get_export_path()
+            except Exception:
+                pass
+
+        return ""
+
     def log_callback_shim(self, msg):
         """Bridge the worker log signal into the log page widget."""
-        self.log_page.append_log(msg)
+        try:
+            self.log_page.append_log(msg)
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        """Prevent teardown while the worker thread is still running."""
+        if hasattr(self, "home_page") and hasattr(self.home_page, "is_worker_running"):
+            try:
+                if self.home_page.is_worker_running():
+                    InfoBar.warning(
+                        title="Calculation Running",
+                        content="Please wait until the current calculation finishes before closing the app.",
+                        parent=self,
+                        position=InfoBarPosition.TOP_RIGHT,
+                        duration=4000,
+                    )
+                    event.ignore()
+                    return
+            except Exception:
+                pass
+
+        super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

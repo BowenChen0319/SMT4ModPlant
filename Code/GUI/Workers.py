@@ -1,6 +1,7 @@
 # Code/GUI/Workers.py
 import sys
 import os
+import copy
 import traceback
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -10,6 +11,7 @@ try:
     from Code.SMT4ModPlant.AASxmlCapabilityParser import parse_capabilities_robust
     from Code.SMT4ModPlant.SMT4ModPlant_main import run_optimization
     from Code.Optimizer.Optimization import SolutionOptimizer
+    from Code.Transformator.MasterRecipeGenerator import generate_b2mml_master_recipe
 except ImportError as e:
     print("Import Error inside Workers.py: Could not load backend modules.")
     print(f"Specific Error: {e}")
@@ -28,6 +30,69 @@ class SMTWorker(QThread):
         self.resource_dir = resource_dir
         self.mode_index = mode_index  # 0: all results, 1: weighted sorted all results
         self.weights = weights 
+
+    @staticmethod
+    def _select_preview_solution_id(json_solutions, mode_index, evaluated_solutions=None):
+        """Pick the most relevant solution for Master Recipe preview."""
+        if mode_index == 1 and evaluated_solutions:
+            return evaluated_solutions[0].get("solution_id")
+        if json_solutions:
+            return json_solutions[0].get("solution_id")
+        return None
+
+    @staticmethod
+    def _build_master_recipe_flow(recipe_data, json_solutions, selected_solution_id):
+        """Create a compact flow representation for the log-page graphics tab."""
+        if not selected_solution_id:
+            return []
+
+        solution_lookup = {}
+        for solution in json_solutions or []:
+            solution_lookup[solution.get("solution_id")] = solution
+
+        solution = solution_lookup.get(selected_solution_id)
+        if not solution:
+            return []
+
+        assignment_by_step = {}
+        for assignment in solution.get("assignments", []):
+            assignment_by_step[assignment.get("step_id")] = assignment
+
+        flow_nodes = [
+            {
+                "kind": "start",
+                "title": "Init",
+                "subtitle": "Master Recipe start",
+                "meta": "",
+                "transition": "",
+            }
+        ]
+
+        previous_step_label = "Init"
+        for index, step in enumerate(recipe_data.get("ProcessElements", []), start=1):
+            assignment = assignment_by_step.get(step.get("ID"), {})
+            capabilities = assignment.get("capabilities") or []
+            capability_name = capabilities[0] if capabilities else "No capability"
+            resource_name = assignment.get("resource", "No resource")
+            step_label = step.get("Description", step.get("ID", "Step"))
+
+            flow_nodes.append({
+                "kind": "operation",
+                "title": f"{index:02d}. {step_label}",
+                "subtitle": resource_name,
+                "meta": capability_name,
+                "transition": "True" if index == 1 else f"Step {previous_step_label} is Completed",
+            })
+            previous_step_label = step_label
+
+        flow_nodes.append({
+            "kind": "end",
+            "title": "End",
+            "subtitle": f"Preview solution {selected_solution_id}",
+            "meta": "",
+            "transition": f"Step {previous_step_label} is Completed" if len(flow_nodes) > 1 else "True",
+        })
+        return flow_nodes
 
     def run(self):
         """Execute the end-to-end workflow: parse inputs, solve constraints, and optionally sort by weighted cost."""
@@ -88,7 +153,7 @@ class SMTWorker(QThread):
             # Optimization logic in main: if generate_json=True, it builds the struct.
             # Let's ALWAYS generate the json struct in memory so export works for any valid solution found.
             
-            gui_results, json_solutions = run_optimization(
+            gui_results, json_solutions, debug_payload = run_optimization(
                 recipe_data, 
                 all_capabilities, 
                 log_callback=self.log_signal.emit, 
@@ -99,6 +164,7 @@ class SMTWorker(QThread):
             self.progress_signal.emit(60, 100)
 
             # 3. Weighted mode: rank all solutions; default mode shows raw all results
+            evaluated_solutions = []
             if is_opt and json_solutions:
                 self.log_signal.emit("Weighted mode: Calculating costs and sorting all solutions...")
                 
@@ -145,13 +211,48 @@ class SMTWorker(QThread):
                     self.log_signal.emit(f"Weighted sorting complete. Top Solution ID: {evaluated_solutions[0]['solution_id']}")
 
             self.progress_signal.emit(100, 100)
+
+            preview_solution_id = self._select_preview_solution_id(
+                json_solutions=json_solutions,
+                mode_index=self.mode_index,
+                evaluated_solutions=evaluated_solutions,
+            )
+
+            master_recipe_preview_xml = ""
+            master_recipe_flow = []
+            if preview_solution_id:
+                try:
+                    preview_recipe_data = copy.deepcopy(recipe_data)
+                    master_recipe_preview_xml = generate_b2mml_master_recipe(
+                        resources_data=all_capabilities,
+                        solutions_data_list=json_solutions,
+                        general_recipe_data=preview_recipe_data,
+                        selected_solution_id=preview_solution_id,
+                        output_path=None,
+                    )
+                    master_recipe_flow = self._build_master_recipe_flow(
+                        recipe_data=recipe_data,
+                        json_solutions=json_solutions,
+                        selected_solution_id=preview_solution_id,
+                    )
+                except Exception as preview_err:
+                    self.log_signal.emit(f"Warning: Failed to build Master Recipe preview: {preview_err}")
             
             # [NEW] Pack context for export
             # We need: Resources (all_capabilities), Solutions (json_solutions), General Recipe (recipe_data)
             context_data = {
                 'resources': all_capabilities,
                 'solutions': json_solutions,
-                'recipe': recipe_data
+                'recipe': recipe_data,
+                'recipe_path': self.recipe_path,
+                'resource_dir': self.resource_dir,
+                'mode_index': self.mode_index,
+                'mode_name': mode_names[self.mode_index],
+                'preview_solution_id': preview_solution_id,
+                'master_recipe_preview_xml': master_recipe_preview_xml,
+                'master_recipe_flow': master_recipe_flow,
+                'smt_model': (debug_payload or {}).get('smt_model', ''),
+                'matching_debug': (debug_payload or {}).get('matching_debug', []),
             }
             
             self.finished_signal.emit(gui_results, context_data)

@@ -18,10 +18,10 @@ from qfluentwidgets import (
     TableWidget,
     SubtitleLabel,
     PushButton,
-    InfoBar,
     InfoBarPosition,
     CheckBox,
 )
+from Code.GUI.Notifications import SafeInfoBar as InfoBar
 
 # Import Generator
 from Code.Transformator.MasterRecipeGenerator import generate_b2mml_master_recipe
@@ -126,6 +126,18 @@ class ResultsWidget(QWidget):
                 return dirs[0]
         return ""
 
+    def _get_preferred_export_dir(self) -> str:
+        """Resolve the export directory from the active main window, with safe fallback."""
+        main_win = self.window()
+        if hasattr(main_win, "get_export_path"):
+            try:
+                export_dir = main_win.get_export_path()
+                if export_dir:
+                    return os.path.normpath(export_dir)
+            except Exception:
+                pass
+        return self._default_user_dir()
+
     # -------------------------
     # Styling sync (export button)
     # -------------------------
@@ -193,17 +205,7 @@ class ResultsWidget(QWidget):
         if not selected_sol_ids:
             return
 
-        main_win = self.window()
-        save_dir = ""
-        if hasattr(main_win, "settings_page"):
-            try:
-                save_dir = main_win.settings_page.get_export_path()
-            except Exception:
-                save_dir = ""
-
-        if not save_dir:
-            save_dir = self._default_user_dir()
-        save_dir = os.path.normpath(save_dir)
+        save_dir = self._get_preferred_export_dir()
 
         if not os.path.exists(save_dir):
             try:
@@ -262,15 +264,9 @@ class ResultsWidget(QWidget):
     # Master Recipe Validation (XSD)
     # =========================
     def validate_master_recipe(self):
-        main = self.window()
-        start_dir = self._default_user_dir()
-        if hasattr(main, "settings_page"):
-            try:
-                d = main.settings_page.get_export_path()
-                if d and os.path.isdir(d):
-                    start_dir = d
-            except Exception:
-                pass
+        start_dir = self._get_preferred_export_dir()
+        if not os.path.isdir(start_dir):
+            start_dir = self._default_user_dir()
 
         xml_path = self._open_file_dialog(
             title="Validate Master Recipe - Step 1/2: Select Master Recipe XML",
@@ -349,15 +345,9 @@ class ResultsWidget(QWidget):
     # Parameter Validation (XML parameters vs AAS capabilities)
     # =========================
     def validate_parameters(self):
-        main = self.window()
-        start_dir = self._default_user_dir()
-        if hasattr(main, "settings_page"):
-            try:
-                d = main.settings_page.get_export_path()
-                if d and os.path.isdir(d):
-                    start_dir = d
-            except Exception:
-                pass
+        start_dir = self._get_preferred_export_dir()
+        if not os.path.isdir(start_dir):
+            start_dir = self._default_user_dir()
 
         xml_path = self._open_file_dialog(
             title="Parameter Validation: Select Master Recipe XML",

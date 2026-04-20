@@ -9,12 +9,13 @@ from PyQt6.QtWidgets import (
 from qfluentwidgets import (
     CardWidget, IconWidget, BodyLabel, CaptionLabel, 
     PrimaryPushButton, PushButton, CheckBox,
-    TitleLabel, SubtitleLabel, FluentIcon, InfoBar, InfoBarPosition, setThemeColor,
+    TitleLabel, SubtitleLabel, FluentIcon, InfoBarPosition, setThemeColor,
     FluentWindow, SwitchButton, DoubleSpinBox, ScrollArea
 )
 
 from Code.GUI.Workers import SMTWorker
 from Code.GUI.Results import ResultsWidget
+from Code.GUI.Notifications import SafeInfoBar as InfoBar
 
 class HomePage(QWidget):
     def __init__(self, log_callback, parent=None):
@@ -32,10 +33,16 @@ class HomePage(QWidget):
         self.prev_vals = {}
         self.anim = None 
         self.split_anim = None
+        self.worker = None
         
         setThemeColor("#00629B")
         
         self.init_ui()
+
+    @staticmethod
+    def _prefer_reduced_motion() -> bool:
+        """Use simpler UI transitions on macOS for stability."""
+        return sys.platform == "darwin"
 
     def _get_logo_path(self):
         """Return absolute path of the RWTH logo image in this package."""
@@ -308,6 +315,15 @@ class HomePage(QWidget):
         if show and self.card_weights.isVisible() and self.card_weights.maximumHeight() > 0: return
         if not show and not self.card_weights.isVisible(): return
 
+        if self._prefer_reduced_motion():
+            if show:
+                self.card_weights.setVisible(True)
+                self.card_weights.setMaximumHeight(16777215)
+            else:
+                self.card_weights.setMaximumHeight(0)
+                self.card_weights.setVisible(False)
+            return
+
         # 1. Measure target height
         self.card_weights.setMaximumHeight(16777215) 
         self.card_weights.adjustSize()
@@ -319,9 +335,11 @@ class HomePage(QWidget):
             if win:
                 current_h = win.height()
                 new_h = current_h + target_height + 20 
-                screen = QApplication.primaryScreen().availableGeometry()
-                if new_h < screen.height():
-                    win.resize(win.width(), new_h)
+                screen = QApplication.primaryScreen()
+                if screen:
+                    available_geo = screen.availableGeometry()
+                    if new_h < available_geo.height():
+                        win.resize(win.width(), new_h)
 
         # 3. Start Animation
         self.anim = QPropertyAnimation(self.card_weights, b"maximumHeight")
@@ -400,7 +418,7 @@ class HomePage(QWidget):
         """Apply consistent theming to the primary run button based on mode."""
         color_hex = "#107C10" if mode_idx == 0 else "#FF8C00"
         btn_style = f"""
-            PrimaryPushButton {{ background-color: {color_hex}; border: 1px solid {color_hex}; border-radius: 6px; color: white; height: 40px; font-size: 16px; font-weight: bold; font-family: 'Segoe UI', sans-serif; }}
+            PrimaryPushButton {{ background-color: {color_hex}; border: 1px solid {color_hex}; border-radius: 6px; color: white; height: 40px; font-size: 16px; font-weight: bold; }}
             PrimaryPushButton:hover {{ background-color: {color_hex}; border: 1px solid {color_hex}; }}
             PrimaryPushButton:pressed {{ background-color: {color_hex}; opacity: 0.8; }}
             PrimaryPushButton:disabled {{ background-color: {color_hex}; opacity: 0.5; border: 1px solid {color_hex}; color: rgba(255, 255, 255, 0.8); }}
@@ -481,9 +499,37 @@ class HomePage(QWidget):
         if self.recipe_path and self.resource_dir:
             self.btn_run.setEnabled(True)
 
+    def is_worker_running(self) -> bool:
+        """Return whether a calculation thread is currently active."""
+        return bool(self.worker is not None and self.worker.isRunning())
+
+    def _cleanup_worker_reference(self):
+        """Release the completed worker safely after the thread finishes."""
+        finished_worker = self.sender()
+        if finished_worker is not None and hasattr(finished_worker, "deleteLater"):
+            finished_worker.deleteLater()
+
+        if finished_worker is self.worker:
+            self.worker = None
+
     def run_process(self):
         """Instantiate the worker thread and kick off result calculation processing."""
+        if self.is_worker_running():
+            InfoBar.warning(
+                title="Calculation Running",
+                content="A calculation is already in progress. Please wait until it finishes.",
+                parent=self,
+                position=InfoBarPosition.TOP_RIGHT,
+            )
+            return
+
         self.btn_run.setEnabled(False)
+        main = self.window()
+        if hasattr(main, "log_page") and hasattr(main.log_page, "reset_for_run"):
+            try:
+                main.log_page.reset_for_run(self.recipe_path, self.resource_dir)
+            except Exception:
+                pass
         self.log_callback("Starting Process...")
         weights = self.get_weights()
         self.worker = SMTWorker(self.recipe_path, self.resource_dir, self.mode_index, weights)
@@ -491,6 +537,7 @@ class HomePage(QWidget):
         self.worker.progress_signal.connect(lambda c, t: (self.pbar.setMaximum(t), self.pbar.setValue(c)))
         self.worker.error_signal.connect(self.handle_error)
         self.worker.finished_signal.connect(self.on_finished)
+        self.worker.finished.connect(self._cleanup_worker_reference)
         self.worker.start()
 
     def on_finished(self, results, context_data):
@@ -499,6 +546,11 @@ class HomePage(QWidget):
         InfoBar.success(title="Completed", content=f"Calculation finished.", parent=self, position=InfoBarPosition.TOP_RIGHT)
         self.results_widget.set_data(results, context_data)
         main = self.window()
+        if hasattr(main, "log_page") and hasattr(main.log_page, "set_context_data"):
+            try:
+                main.log_page.set_context_data(context_data)
+            except Exception as exc:
+                self.log_callback(f"Warning: failed to update log page: {exc}")
         if hasattr(main, "recipe_validator_page") and hasattr(main.recipe_validator_page, "set_context_data"):
             main.recipe_validator_page.set_context_data(context_data)
         self.toggle_results_panel(True)
